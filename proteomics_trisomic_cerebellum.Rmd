@@ -1,0 +1,3365 @@
+---
+title: "Ts65Dn proteomic data"
+
+output:
+  html_document:
+    toc: true
+    toc_depth: 6
+    toc_float: true
+    collapsed: true
+    smooth_scroll: true
+    number_sections: false
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, comment=NA, message=FALSE}
+library(knitr)
+opts_chunk$set(echo=FALSE, warning=FALSE, comment=NA, message=FALSE, cache=TRUE, width=2000, dev=c('png', 'pdf'))
+options(width=2000)
+require(kableExtra)
+options(knitr.table.format = "html") 
+```
+
+
+## Summary
+
+Mass spectrometry to detect the protein levels on 4 groups of mice:
+
+
+* WT_NT (wild type mice not treated)
+* WT_greentea (wild type mice after greentea treatment)f
+
+* TG_NT (5  trisomic mice not treated)
+* TG_greentea (4  trisomic mice after greentea treatment)
+
+
+
+We performed differential expression with the same threshold that mireia used. Absolute log2 fold Change higher than 0.3 and adjusted p.value < 0.05.
+
+
+```{r }
+load("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/blood_microparticle.RData")
+# load("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/conv_last.RData")
+load("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/dyrk1a_targets_new_complete.rda")
+
+
+get_peptide_sequence=function(x){#get peptide sequence getting read of parentheses with probability
+  x=suppressWarnings(unlist(strsplit(x, "[()]")))
+  a=as.numeric(x)
+  
+  x=x[is.na(a)]
+  return(paste(x, collapse=""))
+}
+
+add_details=function(df){ #add details to the data frame such as protein name, probabilities and sequence
+  df$protein=unlist(lapply(rownames(df), FUN=function(x){unlist(strsplit(x, "_"))[1]}))
+  
+  df$probabilities=unlist(lapply(rownames(df), FUN=function(x){unlist(strsplit(x, "_"))[2]}))
+  
+  df$sequence=unlist(lapply(as.character(df$probabilities), FUN=get_peptide_sequence))
+  
+  return(df)}
+get_up=function(df, log2FC=0.3, pvalue=0.05){ #get de proteins of desired abs log2FC and p.value 
+  df_de=df[which(df$log2FC<=(-1)*log2FC),]
+  df_de=df_de[df_de$adj.pvalue<pvalue,]
+  return(df_de)
+}
+
+get_down=function(df, log2FC=0.3, pvalue=0.05){ #get de proteins of desired abs log2FC and p.value 
+  df_de=df[which(df$log2FC>=log2FC),]
+  df_de=df_de[df_de$adj.pvalue<pvalue,]
+  return(df_de)
+}
+
+
+###reading proteomic files
+
+data_proteomic=list(
+pwttg=read.table("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/myresults_WT_TG.txt", header=T, row.names=1),
+
+pwt_wtegcg=read.table("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/myresults_WT_NT-WT_EGCG.txt", header=T, row.names=1),
+
+
+ptg_tgegcg=read.table("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/myresults_TG_NT-TG_EGCG.txt", header=T, row.names=1),
+
+
+pint_egcg=read.table("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/myresults_WT_NT-WT_EGCG_-_TG_NT-TG_EGCG.txt", header=T, row.names=1)
+)
+
+###present proteomic
+
+presences_proteomic=list(
+ wttg_pa1=unique(as.character(read.csv("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inTGnotinWT.csv")$Leading.razor.protein)),
+ 
+ wt_wtegcg_pa1=unique(as.character(read.csv("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inWTEGCGnotinWTNT.csv")$Leading.razor.protein)),
+
+ 
+ tg_tgegcg_pa1=unique(as.character(read.csv("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inTGEGCGnotinTGNT.csv")$Leading.razor.protein)),
+
+ 
+ int_egcg_pa1=unique(as.character(read.csv("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/pa1intEGCG.csv")$Leading.razor.protein))
+
+
+)
+
+###absent proteomic
+
+absences_proteomic=list(
+wttg_pa2=unique(as.character(read.csv("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inWTnotinTG.csv")$Leading.razor.protein)),
+
+wt_wtegcg_pa2=unique(as.character(read.csv("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inWTNTnotinWTEGCG.csv")$Leading.razor.protein)),
+
+tg_tgegcg_pa2=unique(as.character(read.csv("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inTGNTnotinTGEGCG.csv")$Leading.razor.protein)),
+
+int_egcg_pa2=unique(as.character(read.csv("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/pa2intEGCG.csv")$Leading.razor.protein))
+)
+
+
+
+```
+
+
+
+```{r}
+###filtering for plasma
+
+data_proteomic=lapply(data_proteomic, FUN=function(x)(x[!(rownames(x) %in% plasma),]))
+presences_proteomic=lapply(presences_proteomic, FUN=function(x)(x[!(x %in% plasma)]))
+absences_proteomic=lapply(absences_proteomic, FUN=function(x)(x[!(x %in% plasma)]))
+
+
+
+```
+
+
+
+
+```{r}
+proteome_matrix=matrix(rep(NA,5*6), 5,6)
+
+
+rownames(proteome_matrix)=c("TG.NT-WT.NT", "WT.EGCG-WT.NT",  "TG.EGCG-TG.NT",  "(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)", "rescued by EGCG")
+
+colnames(proteome_matrix)=c("Detected proteins (n)", "Upregulated (n)", "Present in TG, absent in WT", "Downregulated (n)", "Absent in TG, present in WT", "DYRK1A targets")
+
+proteome_matrix=as.data.frame(proteome_matrix)
+```
+
+```{r}
+###filling the table
+
+###detected_proteins
+proteome_matrix$`Detected proteins (n)`[1:length(data_proteomic)]=unlist(lapply(data_proteomic, FUN=function(x)(length(rownames(x)))))
+
+proteome_matrix$`Upregulated (n)`[1:length(data_proteomic)]=unlist(lapply(data_proteomic, FUN=function(x)(dim(get_up(x))[1])))
+
+proteome_matrix$`Downregulated (n)`[1:length(data_proteomic)]=unlist(lapply(data_proteomic, FUN=function(x)(dim(get_down(x))[1])))
+
+
+proteome_matrix$`Present in TG, absent in WT`[1:length(data_proteomic)]=unlist(lapply(presences_proteomic, FUN=function(x)(length(x))))
+
+proteome_matrix$`Absent in TG, present in WT`[1:length(data_proteomic)]=unlist(lapply(absences_proteomic, FUN=function(x)(length(x))))
+
+
+
+
+
+### adding dyrk1a targets
+
+# load("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_without_plasma/Mireia/proteinsdeindyrk1a.RData")
+
+names(presences_proteomic)=c("TG.NT-WT.NT", "WT.EGCG-WT.NT",  "TG.EGCG-TG.NT",  "(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)")
+names(absences_proteomic)=c("TG.NT-WT.NT", "WT.EGCG-WT.NT", "TG.EGCG-TG.NT",  "(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)")
+
+lista_down_proteomic=lapply(data_proteomic, FUN=function(x)(rownames(get_down(x))))
+lista_up_proteomic=lapply(data_proteomic, FUN=function(x)(rownames(get_up(x))))
+
+lista_de_proteome=absences_proteomic
+for(i in 1:4){
+  lista_de_proteome[[i]]=unique(c(lista_down_proteomic[[i]],lista_up_proteomic[[i]],presences_proteomic[[i]],absences_proteomic[[i]]))
+}
+
+
+
+```
+
+
+
+
+```{r}
+names(lista_de_proteome)=c("TG.NT-WT.NT", "WT.EGCG-WT.NT",  "TG.EGCG-TG.NT",  "(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)")
+
+```
+
+
+```{r}
+de_proteome_peptides=lista_de_proteome$`TG.NT-WT.NT`
+
+fc_tgwt=data_proteomic$pwttg$log2FC[which(rownames(data_proteomic$pwttg) %in% as.character(de_proteome_peptides))]*-1
+names(fc_tgwt)=rownames(data_proteomic$pwttg)[which(rownames(data_proteomic$pwttg) %in% as.character(de_proteome_peptides))]
+
+
+fc_egcgwt=data_proteomic$pwt_wtegcg$log2FC[which(rownames(data_proteomic$pwt_wtegcg) %in% as.character(de_proteome_peptides))]*-1
+names(fc_egcgwt)=rownames(data_proteomic$pwt_wtegcg)[which(rownames(data_proteomic$pwt_wtegcg) %in% as.character(de_proteome_peptides))]
+
+
+
+fc_egcgtg=data_proteomic$ptg_tgegcg$log2FC[which(rownames(data_proteomic$ptg_tgegcg) %in% as.character(de_proteome_peptides))]*-1
+names(fc_egcgtg)=rownames(data_proteomic$ptg_tgegcg)[which(rownames(data_proteomic$ptg_tgegcg) %in% as.character(de_proteome_peptides))]
+
+
+
+df=list(
+  `TG.NT-WT.NT`=fc_tgwt,
+  `WT.EGCG-WT.NT`=fc_egcgwt,
+  
+  `TG.EGCG-TG.NT`=fc_egcgtg
+)
+
+data_absences_proteome_common=absences_proteomic
+
+for(i in 1:length(data_absences_proteome_common)){
+  
+  onlyprot=data_absences_proteome_common[[i]]
+  
+  data_absences_proteome_common[[i]]=rep(-1*max(abs(min(unlist(df)) -0.05),abs(max(unlist(df))+0.05)),length(data_absences_proteome_common[[i]][which(onlyprot %in% as.character(de_proteome_peptides))]))
+  names( data_absences_proteome_common[[i]])=onlyprot[which(onlyprot %in% as.character(de_proteome_peptides))]
+}
+
+
+data_presences_proteome_common=presences_proteomic
+
+for(i in 1:length(data_presences_proteome_common)){
+  
+  onlyprot=data_presences_proteome_common[[i]]
+  
+  data_presences_proteome_common[[i]]=rep(max(abs(min(unlist(df)) -0.05),abs(max(unlist(df))+0.05)),length(data_presences_proteome_common[[i]][which(onlyprot %in% as.character(de_proteome_peptides))]))
+  names( data_presences_proteome_common[[i]])=onlyprot[which(onlyprot %in% as.character(de_proteome_peptides))]
+  
+}
+
+
+names(data_presences_proteome_common)=names(df)
+names(data_absences_proteome_common)=names(df)
+
+df_final=df
+
+for(i in 1:length(df)){
+  df_final[[i]]=c(as.numeric(df[[i]]),data_presences_proteome_common[[i]], data_absences_proteome_common[[i]])
+  names(df_final[[i]])=c(names(df[[i]]),names(data_presences_proteome_common[[i]]), names(data_absences_proteome_common[[i]]))
+}
+
+df_final_nonames=df_final
+names(df_final_nonames)=rep(NULL, length(df_final_nonames))
+
+peptides=unique(names(unlist(df_final_nonames)))
+
+mat=matrix(rep(NA,length(peptides)*length(df_final)), nrow=length(peptides),ncol=length(df_final))
+
+colnames(mat)=names(df_final)
+rownames(mat)=peptides
+
+
+for(i in 1:length(df)){
+  indici_mat=rownames(mat)[which(rownames(mat) %in% names(df_final[[i]]))]
+  mat[indici_mat,i]=df_final[[i]][indici_mat]
+  
+}
+
+
+
+mat2exp=2**mat
+mat2exp_wt=2**(-1*mat)
+
+
+mat_recovery_proteome=matrix(rep(NA,dim(mat2exp)[1]*2), nrow=dim(mat2exp)[1],ncol=2)
+
+for(i in 1){
+  mat_recovery_proteome[,i]=(mat2exp_wt[,1]-(mat2exp_wt[,1]*mat2exp[,(i+1)]))/(mat2exp_wt[,1]-1)
+}
+for(i in 2){
+  mat_recovery_proteome[,i]=(mat2exp[,1]-(mat2exp[,1]*mat2exp[,(i+1)]))/(mat2exp[,1]-1)
+}
+colnames(mat_recovery_proteome)=colnames(mat2exp)[2:3]
+rownames(mat_recovery_proteome)=rownames(mat2exp)
+
+
+
+
+mat_comparison_proteome=matrix(rep(NA,dim(mat2exp)[1]*dim(mat)[2]), nrow=dim(mat2exp)[1],ncol=dim(mat)[2])
+
+for(i in 1:2){
+  mat_comparison_proteome[,i]=mat[,i]
+}
+for(i in 3){
+  mat_comparison_proteome[,i]=mat[,1]+mat[,(i)]
+}
+
+colnames(mat_comparison_proteome)=c("TG.NT", "WT.EGCG",  "TG.EGCG")
+rownames(mat_comparison_proteome)=rownames(mat)
+
+ordering_proteome=order(mat_comparison_proteome[,1])
+mat_comparison_proteome=mat_comparison_proteome[ordering_proteome,]
+```
+
+
+```{r}
+###adding rescued proteins
+
+
+
+rescued_proteome=list("EGCG"=rownames(mat_recovery_proteome)[unique(c(intersect(which(mat_recovery_proteome[,2] <=1.5), which((mat_recovery_proteome[,2]>=0.5)))))])
+
+
+
+
+impaired_proteome_wt=list("EGCG"=rownames(mat_recovery_proteome)[unique(c(intersect(which(mat_recovery_proteome[,1] <=1.5), which((mat_recovery_proteome[,1]>=0.5)))))])
+
+
+```
+
+
+```{r}
+proteome_matrix$`Detected proteins (n)`[(length(data_proteomic)+1): dim(proteome_matrix)[1]]=unlist(lapply(rescued_proteome, FUN=function(x)(length(x))))
+
+lista_de_proteome=c(lista_de_proteome,rescued_proteome)
+names(lista_de_proteome)=c("TG.NT-WT.NT", "WT.EGCG-WT.NT",  "TG.EGCG-TG.NT",  "(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)", "rescued by EGCG")
+
+
+
+```
+
+```{r}
+###overlap with rescued
+
+up_rescued=c(NA,NA,NA)
+down_rescued=c(NA,NA,NA)
+present_rescued=c(NA,NA,NA)
+absent_rescued=c(NA,NA,NA)
+
+
+
+lista_dyrk1a_proteome=c(lista_de_proteome)
+
+for(i in 1:length(lista_dyrk1a_proteome)){
+  lista_dyrk1a_proteome[[i]]=intersect(lista_de_proteome[[i]], dyrk1a_targets)
+}
+
+
+detected_dyrk1a=unique(c(unlist(lista_dyrk1a_proteome)))
+
+
+require(UniProt.ws)
+up <- UniProt.ws(taxId = 10090)
+a <- UniProt.ws::select(up, keys = detected_dyrk1a, columns=c("GENES", "UNIPROTKB"),keytype = "UNIPROTKB")
+require(biomaRt)
+mouse=useMart(biomart = "ENSEMBL_MART_ENSEMBL",dataset="mmusculus_gene_ensembl")
+
+A=getBM(attributes=c("uniprotswissprot", "mgi_symbol"),filters="uniprotswissprot", values=detected_dyrk1a, mart = mouse)
+
+
+toadd=setdiff(a$UNIPROTKB, A$uniprot_swissprot)
+
+
+for(i in 1:length(toadd)){
+adding=c(toadd[[i]],strsplit(a[as.character(a$UNIPROTKB) == toadd[i],2], split=" ")[[1]][1])
+A=rbind(A, adding)
+}
+
+conversion=A
+
+lista_dyrk1a_proteome_symbols=lista_dyrk1a_proteome
+
+for(i in 1:length(lista_dyrk1a_proteome)){
+  lista_dyrk1a_proteome_symbols[[i]]=conversion$mgi_symbol[which(conversion$uniprotswissprot %in% lista_dyrk1a_proteome[[i]])]
+}
+
+for(i in 1:length(lista_dyrk1a_proteome_symbols)){
+  lista_dyrk1a_proteome_symbols[[i]]=paste(lista_dyrk1a_proteome_symbols[[i]], collapse=", ")
+}
+
+```
+
+
+```{r}
+
+
+### adding interactors
+add_interactors=function(lista, interactions){
+  #lista is a list with uniprot ID to be expanded
+  #list of interactions
+
+inter=interactions[unique(c(which(as.character(interactions$V1) %in% lista), which(as.character(interactions$V2) %in% lista))),]
+
+lista_expanded=unique(c(as.character(inter$V1), as.character(inter$V2), lista))
+
+lista_expanded=lista_expanded[!(lista_expanded %in% plasma)]
+
+return(lista_expanded)
+}
+
+interactions=read.table("~/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/ppidb_2017_01_binary.txt", sep="\t")
+
+
+proteome_expanded=lista_de_proteome
+
+for(l in 1:length(proteome_expanded)){
+  proteome_expanded[[l]]=add_interactors(proteome_expanded[[l]],interactions)
+}
+
+
+
+
+lista_dyrk1a_proteome_expanded=c(lista_de_proteome)
+
+for(i in 1:length(lista_dyrk1a_proteome_expanded)){
+  lista_dyrk1a_proteome_expanded[[i]]=intersect(proteome_expanded[[i]], dyrk1a_targets)
+}
+
+
+detected_dyrk1a=unique(c(unlist(lista_dyrk1a_proteome_expanded)))
+
+
+a <- UniProt.ws::select(up, keys = detected_dyrk1a, columns=c("GENES", "UNIPROTKB"),keytype = "UNIPROTKB")
+
+A=getBM(attributes=c("uniprotswissprot", "mgi_symbol"),filters="uniprotswissprot", values=detected_dyrk1a, mart = mouse)
+
+toadd=setdiff(a$UNIPROTKB, A$uniprot_swissprot)
+
+
+for(i in 1:length(toadd)){
+adding=c(toadd[[i]],strsplit(a[as.character(a$UNIPROTKB) == toadd[i],2], split=" ")[[1]][1])
+A=rbind(A, adding)
+}
+
+conversion=A
+
+
+### remvoe overlap with seed
+
+for(i in 1:length(lista_dyrk1a_proteome)){
+  lista_dyrk1a_proteome_expanded[[i]]=setdiff(lista_dyrk1a_proteome_expanded[[i]],lista_dyrk1a_proteome[[i]])
+}
+
+lista_dyrk1a_proteome_symbols_int=lista_dyrk1a_proteome
+
+for(i in 1:length(lista_dyrk1a_proteome)){
+  lista_dyrk1a_proteome_symbols_int[[i]]=conversion$mgi_symbol[which(conversion$uniprotswissprot %in% lista_dyrk1a_proteome_expanded[[i]])]
+}
+
+for(i in 1:length(lista_dyrk1a_proteome_symbols_int)){
+  lista_dyrk1a_proteome_symbols_int[[i]]=paste(unique(lista_dyrk1a_proteome_symbols_int[[i]]), collapse=", ")
+}
+
+
+
+```
+
+
+
+
+```{r}
+
+proteome_matrix$`DYRK1A targets`=lista_dyrk1a_proteome_symbols
+proteome_matrix$`DYRK1A targets (in first interactors)`=lista_dyrk1a_proteome_symbols_int
+```
+
+```{r}
+universe_proteomic=absences_proteomic
+
+for(a in 1:length(absences_proteomic)){
+  universe_proteomic[[a]]=unique(c(rownames(data_proteomic[[a]]), absences_proteomic[[a]], presences_proteomic[[a]]))
+}
+
+
+```
+
+```{r}
+
+up_rescued_proteome=c(NA)
+down_rescued_proteome=c(NA)
+present_rescued_proteome=c(NA)
+absent_rescued_proteome=c(NA)
+
+
+for(i in 1){
+  up_rescued_proteome[i]=length(intersect(rescued_proteome[[i]], lista_up_proteomic[[1]]))
+  down_rescued_proteome[i]=length(intersect(rescued_proteome[[i]], lista_down_proteomic[[1]]))
+  present_rescued_proteome[i]=length(intersect(rescued_proteome[[i]], presences_proteomic[[1]]))
+  absent_rescued_proteome[i]=length(intersect(rescued_proteome[[i]], absences_proteomic[[1]]))
+}
+
+
+# proteome_matrix$`Upregulated (n)`[(length(data_proteomic)+1): dim(proteome_matrix)[1]]=up_rescued_proteome
+# proteome_matrix$`Downregulated (n)`[(length(data_proteomic)+1): dim(proteome_matrix)[1]]=down_rescued_proteome
+# proteome_matrix$`Present in TG, absent in WT`[(length(data_proteomic)+1): dim(proteome_matrix)[1]]=present_rescued_proteome
+# proteome_matrix$`Absent in TG, present in WT`[(length(data_proteomic)+1): dim(proteome_matrix)[1]]=absent_rescued_proteome
+```
+
+
+
+
+### Proteomic data
+
+```{r}
+
+proteome_matrix$`Detected proteins (n)`[1:4]=unlist(lapply(universe_proteomic, FUN=length))
+options(knitr.table.format = "html") 
+kable(proteome_matrix, "html") %>%
+    kable_styling(position = "left", bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) 
+
+```
+
+Table showing the detected proteins for each contrasts. For a protein to be "detected" it should be present in at least 3, 4, or 5 biological replicates (or 2, 3, and 4 when we had only 4 animals per group).
+"Present proteins"" also are defined as those proteins present in at least 3,4,5 biological replicates out of 5 (or 2, 3, 4 out of 4).
+"Absent proteins"" are defined as proteins not present, or present only in one biological replicate.
+
+
+
+
+## Overlaps
+
+```{r}
+detected_proteins=unique(unlist(universe_proteomic))
+
+
+universe_for_overlap=c(universe_proteomic,(list(detected_proteins)))
+
+
+
+names(universe_for_overlap)=c("TG.NT-WT.NT", "WT.EGCG-WT.NT", "TG.EGCG-TG.NT",  "(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)", "rescued by EGCG")
+
+
+count_table<-function(category, universe, de_list_inuniverse, de_list_incat){#given number of element in each list create a contigency table for performing fisher test
+  mat=matrix(c(de_list_incat, 
+               de_list_inuniverse-de_list_incat,
+               category-de_list_incat,
+               universe-(category-de_list_incat+de_list_inuniverse)),2)
+}
+
+
+
+
+
+create_overlap_matrix=function(lista, universo){
+  mat1a=matrix(rep(NA,length(lista)*length(lista)), length(lista),length(lista)) #pvalue
+  mat=matrix(rep(NA,length(lista)*length(lista)), length(lista),length(lista)) #overlap coef
+rownames(mat)=names(lista)
+colnames(mat)=names(lista)
+rownames(mat1a)=names(lista)
+colnames(mat1a)=names(lista)
+for (o in 1:length(lista)){
+  for (n in 1:length(lista)){
+    ou=universo[[o]] #universe
+    nu=universo[[n]] #universe
+    op=lista[[o]]
+    np=lista[[n]]
+    universe=length(unique(c(ou,nu)))
+    category=length(unique(op))
+    de_list_inuniverse=length(unique(np))
+    de_list_incat=length(intersect(unique(np), unique(op)))
+    table=count_table(category, universe, de_list_inuniverse, de_list_incat)
+    f=fisher.test(table, alternative="greater")
+    #matrix(c(n - union(A,B), setdiff(A,B), setdiff(B,A), intersect(A,B)), nrow=2)
+    mat1a[o,n]=f$p.value
+    mat[o,n]=length(intersect(op,np))/min(length(op), length(np))
+    
+  }}
+  
+  for(righe in 1:length(rownames(mat1a))){
+  for(colonne in 1:length(colnames(mat1a))){
+    
+    if(righe<=colonne){
+      mat1a[righe, colonne]=NA
+
+}}}
+
+  for(righe in 1:length(rownames(mat))){
+  for(colonne in 1:length(colnames(mat))){
+    
+    if(righe<=colonne){
+      mat[righe, colonne]=NA
+
+}}}
+  
+  return(list(mat1a, mat))
+}
+
+
+create_overlap_matrix2=function(lista1, lista2, universo1, universo2){
+  mat1a=matrix(rep(NA,length(lista1)*length(lista2)), length(lista1),length(lista2)) #pvalue
+  mat=matrix(rep(NA,length(lista1)*length(lista2)), length(lista1),length(lista2)) #overlap coef
+rownames(mat)=names(lista1)
+colnames(mat)=names(lista2)
+rownames(mat1a)=names(lista1)
+colnames(mat1a)=names(lista2)
+for (o in 1:length(lista1)){
+  for (n in 1:length(lista2)){
+    ou=universo1[[o]] #universe
+    nu=universo2[[n]] #universe
+    op=lista1[[o]]
+    np=lista2[[n]]
+    universe=length(unique(c(ou,nu)))
+    category=length(unique(op))
+    de_list_inuniverse=length(unique(np))
+    de_list_incat=length(intersect(unique(np), unique(op)))
+    table=count_table(category, universe, de_list_inuniverse, de_list_incat)
+    f=fisher.test(table, alternative="greater")
+    #matrix(c(n - union(A,B), setdiff(A,B), setdiff(B,A), intersect(A,B)), nrow=2)
+    mat1a[o,n]=f$p.value
+    mat[o,n]=length(intersect(op,np))/min(length(op), length(np))
+    
+  }}
+  
+  return(list(mat1a, mat))
+}
+
+overlaps_proteome=create_overlap_matrix(lista_de_proteome, universe_for_overlap)
+
+```
+
+
+
+```{r, fig.show="hide", fig.width = 25, fig.height=7}
+require(gplots)
+library(gridGraphics)
+library(grid)
+grab_grob <- function(){
+  grid.echo()
+  grid.grab()
+}
+require(gridExtra)
+require(RColorBrewer)
+arr=list(round(overlaps_proteome[[1]][c(1,3),c(1,3)],2))
+arr2=list(round(overlaps_proteome[[2]][c(1,3),c(1,3)],2))
+titles=c("Proteome (DE)")
+
+
+  heatmap.2(overlaps_proteome[[1]], dendrogram="none", scale="none", density.info="none", trace="none", col=rev(colorRampPalette(brewer.pal(9, "OrRd"))(256)), key.title="", Rowv=FALSE, Colv=rev("Rowv")
+            ,cellnote=round(overlaps_proteome[[2]],2)
+            , keysize=1,key.xlab ="p-value Fisher test",margins=c(13.5,27),srtCol=45, notecex=2,
+            breaks=c(seq(0,1,length=257)))
+  
+
+
+require(eulerr)
+plot(euler(lista_de_proteome[c(1,3,5)], shape = "ellipse"), quantities = TRUE)
+```
+
+```{r venna}
+venna=plot(euler(lista_de_proteome[c(1,3,5)], shape = "ellipse"), quantities = TRUE)
+
+```
+
+
+```{r}
+data_rescued=data.frame("UniProt"=unique(unlist(c(rescued_proteome))))
+
+
+data_rescued$`Rescued Abunance by EGCG`[(data_rescued$UniProt %in% unique(unlist(rescued_proteome$EGCG)))]="yes"
+
+
+
+
+data_rescued$`Rescued Abunance by EGCG`[(data_rescued$UniProt %in% unique(unlist(rescued_proteome$EGCG)))]=round(mat_recovery_proteome[as.character(data_rescued$UniProt[(data_rescued$UniProt %in% unique(unlist(rescued_proteome$EGCG)))]),2],2)
+
+
+
+require(UniProt.ws)
+
+data_rescued$UniProt=gsub("Q9CQU1","C0HKD8", data_rescued$UniProt)
+
+
+rescued_metadata=UniProt.ws::select(up, keys = data_rescued$UniProt, columns=c("GENES", "PROTEIN-NAMES", "UNIPROTKB", "SEQUENCE"),keytype = "UNIPROTKB")
+
+
+data_rescued$Name=rescued_metadata$GENES
+data_rescued$Description=rescued_metadata$`PROTEIN-NAMES`
+
+
+
+```
+
+```{r}
+kable(data_rescued, "html") %>%
+    kable_styling(position = "left", bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = T) %>%  scroll_box(width = "2000px", height = "1200px")
+```
+
+```{r datarescue}
+write.csv(data_rescued, "data_rescued.csv")
+```
+
+## Overlap with Dyrk1a Targets
+
+We took as DYRK1A targets the mammalian verified target present in Aranda et al., 2010 and Duchon A. et al.,2016. Below for each comparison the DYRK1A target which are present in the DE lists.
+
+```{r}
+lista_de_joint = apply( cbind(  lista_de_proteome ) , 1 , unlist )
+lista_de_joint=lapply(lista_de_joint, unique)
+
+universe_total = apply( cbind( universe_for_overlap ) , 1 , unlist )
+universe_total=lapply(universe_total, unique)
+
+detect_enrichment=function(lista_DE,lista_bg, lista_targets){
+pvalues=rep(NA, length(lista_DE))
+
+for(i in 1:length(lista_DE)){
+category=length(lista_DE[[i]])
+universe=length(lista_bg[[i]])
+de_list_inuniverse=length(intersect(lista_targets,lista_bg[[i]]))
+de_list_incat=length(intersect(lista_targets,lista_DE[[i]]))
+mat=count_table(category, universe, de_list_inuniverse, de_list_incat)
+f=fisher.test((mat), alternative="greater")$p.value
+pvalues[i]=f
+}
+names(pvalues)=names(lista_DE)
+return(pvalues)
+}
+
+detect_enrichment2=function(lista_DE, lista_targets){
+  overlaps=rep(NA, length(lista_DE))
+  
+  for(i in 1:length(lista_DE)){
+    overlaps[i]=length(intersect(lista_targets,lista_DE[[i]]))/min(length(lista_targets),length(lista_DE[[i]]))
+  }
+  return(overlaps)
+}
+
+mat2=cbind(detect_enrichment(lista_de_proteome, universe_for_overlap, dyrk1a_targets))
+
+mat2o=cbind(detect_enrichment2(lista_de_proteome, dyrk1a_targets))
+
+
+
+```
+
+```{r}
+universe_for_overlap_expanded=universe_for_overlap
+for(l in 1:length(universe_for_overlap)){
+  universe_for_overlap_expanded[[l]]=add_interactors(universe_for_overlap[[l]],interactions)
+}
+
+lista_de_joint_expanded = apply( cbind(  proteome_expanded ) , 1 , unlist )
+lista_de_joint_expanded=lapply(lista_de_joint_expanded, unique)
+
+universe_total_expanded = apply( cbind( universe_for_overlap_expanded) , 1 , unlist )
+universe_total_expanded=lapply(universe_total_expanded, unique)
+
+mat3=cbind(detect_enrichment(proteome_expanded, universe_for_overlap_expanded, dyrk1a_targets))
+
+mat3o=cbind(detect_enrichment2(proteome_expanded, dyrk1a_targets))
+
+colnames(mat2)=c("DE proteins")
+colnames(mat3)=c("DE proteins + interactors")
+
+```
+
+
+```{r, fig.show="hide", fig.width = 17, fig.height=10}
+arr=cbind(round(mat2,2), round(mat3,2))
+arro=cbind(round(mat2o,2), round(mat3o,2))
+
+
+  heatmap.2(arr, dendrogram="none", scale="none", density.info="none", trace="none", col=rev(colorRampPalette(brewer.pal(9, "OrRd"))(256)), key.title="", Rowv=FALSE, Colv=rev("Rowv"), cex.axis=.5, cexRow=.9, 
+            cexCol=.9,cellnote=arro, keysize=1,key.xlab ="p-value Fisher test",margins=c(13.5,27),srtCol=45, 
+            breaks=c(seq(0,1,length=257)))
+
+
+```
+
+
+
+
+## Interactome
+
+We started with the list of `r length(lista_de_joint[[1]])` proteins whose expression or phosphorylation levels are affected in trisomic mice compared to wild type mice. We used our binary interactions (curated list with high IMEX coming from two-hybrid assays) to expand this list by adding `r length(lista_de_joint_expanded[[1]])-length(lista_de_joint[[1]])` main interactors.
+
+We used this expanded list for retrieving interaction (both physical and functional) from the stringDB database. We were very stringent with our analysis, considering only interaction with a stringdb score higher than 900.
+
+```{r}
+require(STRINGdb)
+require(igraph)
+interaction_binary=interactions
+string_db <- STRINGdb$new(version="11",species=10090,score_threshold=900, input_directory="" )
+list_wttg=as.data.frame(unique(lista_de_joint_expanded[[1]]))
+colnames(list_wttg)="list_wttg"
+
+mapped <- string_db$map( list_wttg, "list_wttg", removeUnmappedRows = FALSE )
+interactions=string_db$get_interactions(mapped$STRING_id )
+tabella=interactions[,c(1,2)]
+graph_string=graph_from_data_frame(tabella, directed = FALSE, vertices = NULL)
+
+
+add_interactors2=function(lista, interactions){
+  #lista is a list with uniprot ID to be expanded
+  #list of interactions
+  
+  inter=interactions[unique(c(which(as.character(interactions$V1) %in% lista), which(as.character(interactions$V2) %in% lista))),]
+
+  inter=inter[-c(which(inter$V1 %in% plasma), which(inter$V2 %in% plasma)),]
+  return(inter)
+}
+
+interaction_added=add_interactors2(lista_de_joint[[1]], interaction_binary)
+
+v1=rep(NA,dim(interaction_added)[1])
+v2=rep(NA,dim(interaction_added)[1])
+
+for(l in 1:(length(v1))){
+  
+  v1[l]=mapped$STRING_id[which(mapped$list_wttg %in% as.character(interaction_added$V1[l]) )]
+  v2[l]=mapped$STRING_id[which(mapped$list_wttg %in% as.character(interaction_added$V2[l]) )]
+}
+
+interaction_added_ens=cbind(v1,v2)
+
+interaction_added_ens=interaction_added_ens[complete.cases(interaction_added_ens),]
+
+interaction_added_ens=as.data.frame(interaction_added_ens)
+primo=paste(interaction_added_ens$v1, interaction_added_ens$v2, sep=".")
+
+secondo=paste(interaction_added_ens$v2, interaction_added_ens$v1, sep=".")
+
+
+interaction_added_ens=interaction_added_ens[-(which(primo %in% intersect(primo, secondo))),]
+graph_added=graph_from_data_frame(as.data.frame(interaction_added_ens), directed = FALSE, vertices = NULL)
+
+```
+
+List of physical interaction from bona fide Aloy's database (number of interacting proteins, followed by number of interactions):
+
+```{r}
+
+summary(graph_added)
+```
+
+List of interaction with very high STRINGdb stringency criteria among the the expanded list (number of interacting proteins, followed by number of interactions):
+
+```{r}
+summary(graph_string)
+
+```
+
+
+Combining the two list of interactions I get the following graph:
+
+```{r}
+graph_string=igraph::simplify(graph_string)
+E(graph_string)$weight=interactions$combined_score
+
+graph_added=igraph::simplify(graph_added)
+E(graph_added)$weight=rep( max(interactions$combined_score)+1, length(ecount(graph_added)))
+
+graph_joint=(graph_string %u% graph_added)
+E(graph_joint)$weight=E(graph_joint)$weight_1
+E(graph_joint)$weight[which(!is.na(E(graph_joint)$weight_2))]=1000
+
+
+interaction_joint <- as.data.frame(get.edgelist(graph_joint))
+summary(graph_joint)
+```
+
+### Looking for significant hubs
+
+The distribution of interaction is heavy righed tailed. The most common value will be 1 interactions and the other will increase exponentially.
+I compared 4 different distributions: power-law, Poisson, exponential, and log-normal. The log-normal distribution is the one better fitting with our data. Therefore I used the log-normal distribution for calculating the p-values associated to each hub (probability of finding a protein by chance with a higher number o interactions).
+
+```{r}
+
+library("poweRlaw")
+require(biomaRt)
+mouse=useMart(biomart = "ENSEMBL_MART_ENSEMBL",dataset="mmusculus_gene_ensembl")
+
+hist(igraph::degree(graph_joint),main="", ylab="number of proteins", xlab="number of interactions")
+
+m1 = displ$new(igraph::degree(graph_joint))
+m1$setPars(estimate_pars(m1))
+
+m2 = dispois$new(igraph::degree(graph_joint))
+m2$setPars(estimate_pars(m2))
+
+m3 = disexp$new(igraph::degree(graph_joint))
+m3$setPars(estimate_pars(m3))
+m4 = dislnorm$new(igraph::degree(graph_joint))
+m4$setPars(estimate_pars(m4))
+
+paste("power-law versus Poisson:", compare_distributions(m1, m2)$p_one_sided)
+paste("power-law versus Exponential:",compare_distributions(m1, m3)$p_one_sided)
+paste("power-law versus log-normal:",compare_distributions(m1, m4)$p_one_sided)
+
+pvalues=rev(dist_cdf(m4, lower_tail = FALSE))
+
+pvalues=as.data.frame(pvalues)
+pvalues$Protein.ID=rownames(pvalues)
+
+num_int=table(c(as.character(interaction_joint$V1),as.character(interaction_joint$V2)))
+num_int=as.data.frame(num_int)
+num_int=merge(num_int, pvalues, by.x="Var1", by.y="Protein.ID")
+
+num_int=num_int[order(num_int$Freq, decreasing = T),]
+
+num_int$ProteinID=unlist(lapply(num_int[,1], FUN=function(x)(substring(x,7))))
+anno=getBM(attributes=c("ensembl_peptide_id", "mgi_symbol", "description"),filters="ensembl_peptide_id", values=unlist(lapply(num_int[,1], FUN=function(x)(substring(x,7)))), mart = mouse)
+
+ranking=merge(num_int, anno, by.x="ProteinID", by.y="ensembl_peptide_id")
+ranking$description=unlist(lapply(ranking$description, FUN=function(x)strsplit(x, split='[', fixed=T)[[1]][1]))
+
+ranking=ranking[order(ranking$Freq, decreasing = TRUE),]
+
+
+
+plot(m1, ylab="Cumulative distribution function", xlab="number of interactions")
+lines(m1, lty=2)
+lines(m2, col=2, lty=2)
+lines(m3, col=3, lty=2)
+lines(m4, col=4, lty=2)
+
+legend("bottomleft", c("power-law", "Poisson", "Exponential","log-normal"), fill=c(1,2,3,4), cex=.65, bty="n")
+```
+
+Number of proteins with a pvalue < .1:
+```{r}
+table(pvalues$pvalues<0.1)
+
+```
+
+
+
+
+```{r}
+rescued_ens=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% unique(c(unlist(rescued_proteome))))]
+
+highly_interacting=rownames(pvalues[which(pvalues$pvalues<0.1),])
+
+nodes=names(igraph::degree(graph_joint))
+nodes_rescued=nodes[which(nodes %in% rescued_ens)]
+```
+
+```{r}
+mean_degree=mean(igraph::degree(graph_joint)[nodes])
+mean_rescued=mean(igraph::degree(graph_joint)[nodes_rescued])
+
+xx=mean(igraph::degree(graph_joint))
+
+yy=mean(igraph::degree(graph_joint)[nodes_rescued])
+```
+
+Of our `r dim(mapped)[1]` proteins `r length(nodes)` where interacting. Of this interacting nodes, `r length(nodes_rescued)` where rescued (`r round(length(nodes_rescued)/length(nodes)*100,2)`%) by at least one of our treatments.
+Mean degree was similar for all proteins `r xx` and for rescued proteins `r yy`.
+
+### Enrichment of DYRK1A targets of highly interacting proteins
+
+```{r}
+
+dyrk1a_targets_ens=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% dyrk1a_targets)]
+degree_avg=mean(igraph::degree(graph_joint)[dyrk1a_targets_ens], na.rm=T)
+```
+
+The DYRK1A target that are present in the network have an average node degree of `r degree_avg`. As you can see, a fisher test for the overlap with the <0.05 hub list, including `r length(intersect(highly_interacting, dyrk1a_targets_ens))` proteins out of `r length(highly_interacting)`, resulted highly significant.
+ 
+```{r}
+
+category=length(dyrk1a_targets_ens)
+universe=length(mapped$STRING_id)
+de_list_inuniverse=length(highly_interacting)
+de_list_incat=length(intersect(highly_interacting,dyrk1a_targets_ens))
+mat=count_table(category, universe, de_list_inuniverse, de_list_incat)
+fisher.test((mat), alternative="greater")
+
+```
+
+```{r}
+
+proteome_ens=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% lista_de_proteome[[1]])]
+seed_ens=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% unique(c(lista_de_proteome[[1]])))]
+
+TG=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% 
+                           unique(c(lista_de_proteome$`TG.EGCG-TG.NT`)))] #green
+
+WT=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% 
+                           unique(c(lista_de_proteome$`WT.EGCG-WT.NT`)))] #green
+
+WTimpaired=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% 
+                           unique(c(impaired_proteome_wt$EGCG)))] #green
+
+EGCG=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% unique(c(unlist(rescued_proteome[[1]]))))  ] #blue
+
+```
+
+
+### MDSplot and quality checks
+
+
+```{r qc}
+data=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/peptides_cerebellum.txt",sep="\t",header=T,as.is=T,stringsAsFactors = FALSE, comment.char = "")
+# de=unique(as.character(unlist(ap)))
+
+rownames(data)=paste(data$Sequence, data$Leading.razor.protein)
+data=data[,c(4:8,10:14, 16:19, 21:25)]
+
+
+# is_na_data=apply(data,1,FUN=function(x)(sum(is.na(x))))
+# table(is_na_data)
+# data_filt=data[which(is_na_data<15),]
+
+require(limma)
+dataset <- new("ExpressionSet", exprs = as.matrix(data))
+lev=c("WT_NT", "WT_EGCG", "TG_NT", "TG_EGCG")
+
+library(Biobase)
+f=sapply(sampleNames(dataset), FUN=function(x)(substr(x, start=1, stop =nchar(x)-4)))
+
+f=factor(f, levels=lev)
+design <- model.matrix(~0+f)
+
+colnames(design) <- lev
+fit <- lmFit(dataset, design)
+
+experimental_design=cbind(names(f), as.character(f),
+                          c(rep(c(1:5),2),
+                            1:4,
+                            1:5
+
+                            ))
+
+experimental_design=as.data.frame(experimental_design)
+colnames(experimental_design)=c("label", "condition", "replicate")
+
+
+tota_se=data
+tota_se$name=rownames(tota_se)
+tota_se$ID=rownames(tota_se)
+
+
+require(DEP)
+data_se <- make_se(tota_se, 1:19, experimental_design)
+
+plot_missval(data_se)
+
+tota_norm=normalize_vsn(data_se)
+
+DEP::meanSdPlot(tota_norm)
+plot_frequency(data_se)
+plot_numbers(data_se)
+plot_coverage(data_se)
+
+plot_normalization(data_se, tota_norm)
+
+
+
+
+plot_detect(data_se)
+
+
+
+tota_norm <- filter_missval(tota_norm, thr = 2)
+
+
+require(vsn)
+require(MSnbase)
+require(DEP)
+
+library("dplyr")
+library("tidyr")
+library("purrr")
+library("ggplot2")
+library("SummarizedExperiment")
+
+
+
+proteins_MNAR <- get_df_long(tota_norm) %>%
+  group_by(name, condition) %>%
+  summarize(NAs = all(is.na(intensity))) %>% 
+  filter(NAs) %>% 
+  pull(name) %>% 
+  unique()
+
+# Get a logical vector
+MNAR <- names(tota_norm) %in% proteins_MNAR
+
+# Perform a mixed imputation
+mixed_imputation <- DEP::impute(
+  tota_norm, 
+  fun = "mixed",
+  randna = !MNAR, # we have to define MAR which is the opposite of MNAR
+  mar = "knn", # imputation function for MAR
+  mnar = "zero") # imputation function for MNAR
+
+
+plot_imputation(tota_norm, mixed_imputation)
+
+
+plotMDS(assay(mixed_imputation))
+
+```
+
+
+
+
+
+
+
+
+
+## Novel Object Recognition
+
+
+### Statistical Testing
+
+We used a general linear hypothesis test, with a posthoc test taking into account only specific contrasts of interst of the interaction between genetype and treatments.
+```{r}
+data=read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/DI_Statistics.csv", sep=";")
+
+data=data[1:77,]
+
+data$Genotype=as.factor(data$Genotype)
+library(multcomp)        # Paquete para las pruebas post-hoc
+mymodel <- lm(DI ~ Genotype*Treatment, data)
+pairwise <- glht(mymodel, linfct = mcp(Genotype = "Tukey"))
+result <- round(cbind(confint(pairwise)$confint, summary(pairwise)$test$pva), 3)
+colnames(result) <- c("Difference", "95%CI Low", "95%CI Upp", "p-value")
+
+
+Treat=as.factor(paste(data$Genotype, data$Treatment, sep="."))
+design=model.matrix(~0+Treat)
+colnames(design) <- levels(Treat)
+require(limma)
+cm <- makeContrasts(TG_vs_WT=TG.NT-WT.NT,
+                    WTEGCG_vs_WTNT=WT.EGCG-WT.NT,  
+                   
+                    TGEGCG_vs_TGNT=TG.EGCG-TG.NT,  
+                    
+                    levels=design)
+
+cm
+dati=as.data.frame(t(data$DI))
+mymodel <- lm(DI ~ 0+Treat, data)    
+
+pairwise <- glht(mymodel, linfct = t(cm))
+summary(pairwise)
+require(ggplot2)
+
+df=data.frame("DI"=as.numeric(data$DI), "Group"=as.factor(as.character(paste(data$Genotype, data$Treatment, sep="."))))
+df$proteomics=rep("no",length(df$Group))
+df$proteomics[c(3,8,12,16,18,20,22,26,33,34,37,40,42,47,57,60,61,62,64,69)]="yes"
+shapes=rep(1.5, length(df$proteomics))
+shapes[which(df$proteomics=="yes")]=3
+df$Group=factor(df$Group, levels=c("WT.NT", "WT.EGCG", "TG.NT", "TG.EGCG"))
+p <- ggplot(df, aes(x=Group, y=DI)) + geom_boxplot(outlier.size=1.5, fill=c("blue", "green", "blue", "green"), color=c(rep("black", 2), rep("red",2)))+ geom_jitter(size=shapes,shape=16, position=position_jitter(0.2))+ylab("Discrimination index (%)")  + theme_bw()
+# Box plot with jittered points
+# 0.2 : degree of jitter in x direction
+p
+```
+
+
+
+
+
+
+```{r}
+load("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/quant_matrix.RData")
+
+quant_matrix=quant_matrix[!(rownames(quant_matrix) %in% plasma),]
+
+
+behaviour2=read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/NOR_parameters_proteomics_complete.csv", header=T)
+codes=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/NOR_parameters_all.txt", sep="\t", row.names=1, stringsAsFactors = FALSE,header=F)
+
+
+code_numbered=(as.integer(codes[1,]))
+colors=rep("*", length(code_numbered))
+quant_matrix=quant_matrix[!(rownames(quant_matrix) %in% plasma),]
+
+correspondences=cbind(as.numeric(code_numbered),as.character(codes[2,]))
+colnames(correspondences)=c("numbers", "Conditions")
+
+codes_behaviour=which(as.numeric(code_numbered) %in% as.numeric(behaviour2$code))
+
+Distance=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/Dist.txt", sep="\t", row.names=1, stringsAsFactors = FALSE,header=T)
+Distance=Distance[correspondences[,1],]
+
+difamnov=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/DI_timeFAM_NOV.txt", sep="\t", row.names=1, stringsAsFactors = FALSE,header=T)
+difamnov=difamnov[correspondences[,1],]
+
+sa=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/SA.txt", sep="\t", row.names=1, stringsAsFactors = FALSE,header=T)
+sa=sa[correspondences[,1],]
+
+behaviour=cbind(sa, Distance,difamnov)
+colnames(behaviour)=c("SA", "Distance/activity",  "DI","%familiar", "%novel")
+
+
+forpca_new=behaviour
+forpca_new$`Distance/activity`=log2(forpca_new$`Distance/activity`)
+
+pc=prcomp(forpca_new, scale.=T, center=T)
+std_dev <- pc$sdev
+
+pr_var <- std_dev^2
+
+prop_varex <- pr_var/sum(pr_var)
+
+correspondences=as.data.frame(correspondences)
+```
+
+### Principal Component Analalysis
+
+The PCA is made taking into account data measured upon a Novel Object Recognition test:
+
+* SA = Spontaneous Alternation
+* %Familiar = Percentage of time spent with the familiar objet
+* %Novel = Percentage of time spent with the novel object
+* DI = Discrimination Index --> (time novel-time familiar)/total time   x  100
+* Distance/Activity
+
+```{r}
+biplot2.default=function(x, y, var.axes = TRUE, col, cex = rep(par("cex"), 2), 
+          xlabs = NULL, ylabs = NULL, expand = 1, xlim = NULL, ylim = NULL, 
+          arrow.len = 0.1, main = NULL, sub = NULL, xlab = NULL, ylab = NULL, col_samples, col_labels,
+          ...) 
+{
+  n <- nrow(x)
+  p <- nrow(y)
+  if (missing(xlabs)) {
+    xlabs <- dimnames(x)[[1L]]
+    if (is.null(xlabs)) 
+      xlabs <- 1L:n
+  }
+  xlabs <- as.character(xlabs)
+  dimnames(x) <- list(xlabs, dimnames(x)[[2L]])
+  if (missing(ylabs)) {
+    ylabs <- dimnames(y)[[1L]]
+    if (is.null(ylabs)) 
+      ylabs <- paste("Var", 1L:p)
+  }
+  ylabs <- as.character(ylabs)
+  dimnames(y) <- list(ylabs, dimnames(y)[[2L]])
+  if (length(cex) == 1L) 
+    cex <- c(cex, cex)
+  if (missing(col)) {
+    col <- par("col")
+    if (!is.numeric(col)) 
+      col <- match(col, palette(), nomatch = 1L)
+    col <- c(col, col + 1L)
+  }
+  else if (length(col) == 1L) 
+    col <- c(col, col)
+  unsigned.range <- function(x) c(-abs(min(x, na.rm = TRUE)), 
+                                  abs(max(x, na.rm = TRUE)))
+  rangx1 <- unsigned.range(x[, 1L])
+  rangx2 <- unsigned.range(x[, 2L])
+  rangy1 <- unsigned.range(y[, 1L])
+  rangy2 <- unsigned.range(y[, 2L])
+  if (missing(xlim) && missing(ylim)) 
+    xlim <- ylim <- rangx1 <- rangx2 <- range(rangx1, rangx2)
+  else if (missing(xlim)) 
+    xlim <- rangx1
+  else if (missing(ylim)) 
+    ylim <- rangx2
+  ratio <- max(rangy1/rangx1, rangy2/rangx2)/expand
+  on.exit(par(op))
+  op <- par(pty = "s")
+  if (!is.null(main)) 
+    op <- c(op, par(mar = par("mar") + c(0, 0, 1, 0)))
+  plot(x, type = "n", xlim = xlim, ylim = ylim, col = col_samples, 
+       xlab = xlab, ylab = ylab, sub = sub, main = main, ...)
+  text(x, xlabs, cex = cex[1L], col = col_samples, ...)
+  par(new = TRUE)
+  dev.hold()
+  on.exit(dev.flush(), add = TRUE)
+  plot(y, axes = FALSE, type = "n", xlim = xlim * ratio, ylim = ylim * 
+         ratio, xlab = "", ylab = "", col = col_samples, ...)
+  axis(3, col = col[2L], ...)
+  axis(4, col = col[2L], ...)
+  box(col = col[1L])
+  text(y, labels = ylabs, cex = cex[2L], col = col_labels, ...)
+  if (var.axes) 
+    arrows(0, 0, y[, 1L] * 0.8, y[, 2L] * 0.8, col = col_labels, 
+           length = arrow.len)
+  invisible()
+}
+
+
+
+
+
+biplot2.prcomp=function (x, choices = 1L:2L, scale = 1, pc.biplot = FALSE, ...) 
+{
+  if (length(choices) != 2L) 
+    stop("length of choices must be 2")
+  if (!length(scores <- x$x)) 
+    stop(gettextf("object '%s' has no scores", deparse(substitute(x))), 
+         domain = NA)
+  if (is.complex(scores)) 
+    stop("biplots are not defined for complex PCA")
+  lam <- x$sdev[choices]
+  n <- NROW(scores)
+  lam <- lam * sqrt(n)
+  if (scale < 0 || scale > 1) 
+    warning("'scale' is outside [0, 1]")
+  if (scale != 0) 
+    lam <- lam^scale
+  else lam <- 1
+  if (pc.biplot) 
+    lam <- lam/sqrt(n)
+  biplot2.default(t(t(scores[, choices])/lam), t(t(x$rotation[, 
+                                                             choices]) * lam), ...)
+  invisible()
+}
+
+```
+
+
+
+```{r}
+correspondences=as.data.frame(correspondences)
+wt_samples=which(correspondences$Conditions=="WT")
+wtegcg_samples=which(correspondences$Conditions=="WT_EGCG")
+
+
+tg_samples=which(correspondences$Conditions=="TG")
+tgegcg_samples=which(correspondences$Conditions=="TG_EGCG")
+
+pc_copy=pc
+
+# pc_copy$x=cbind(c(mean(pc$x[,1][wt_samples]),mean(pc$x[,1][wtegcg_samples]),mean(pc$x[,1][wtee_samples]),mean(pc$x[,1][wtegcgee_samples]),
+#      mean(pc$x[,1][tg_samples]),mean(pc$x[,1][tgegcg_samples]),mean(pc$x[,1][tgee_samples]),mean(pc$x[,1][tgegcgee_samples]) )
+# ,
+# c(mean(pc$x[,2][wt_samples]),mean(pc$x[,2][wtegcg_samples]),mean(pc$x[,2][wtee_samples]),mean(pc$x[,2][wtegcgee_samples]),
+#      mean(pc$x[,2][tg_samples]),mean(pc$x[,2][tgegcg_samples]),mean(pc$x[,2][tgee_samples]),mean(pc$x[,2][tgegcgee_samples]) ))
+# 
+
+
+# par(mfrow=c(1,1),mar=c(4,4,2,2))
+# biplot2.prcomp(pc_copy, scale=0, col_samples = rep(c("blue", "green", "goldenrod1", "purple"),2), col_labels=rainbow(dim(behaviour)[2]),xlab=paste("PC1 (", round(prop_varex[1]*100,2), "%)", sep=""), ylab=paste("PC2 (", round(prop_varex[2]*100,2), "%)", sep=""),xlabs=c(rep("WT",4),rep("TG",4)))
+# legend("topright", legend=c("H20", "EGCG","EE","EGCG+EE"), fill=c("blue", "green", "goldenrod1", "purple"), bty="n")
+```
+
+
+
+
+```{r}
+
+pc1=pc$x[,1]
+# proteomics_phospho=read.csv("NOR_parameters_proteomics_phospho.csv")
+proteomics=read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/NOR_parameters_proteomics.csv")
+
+proteomics=proteomics[c(grep("WT_NT.", proteomics$Animal, fixed=T), grep("WT_EGCG.", proteomics$Animal, fixed=T),grep("TG_NT.", proteomics$Animal, fixed=T), grep("TG_EGCG.", proteomics$Animal, fixed=T)),]
+
+pc1_animals=pc1[as.character(proteomics$code)]
+
+
+df_proteomics=as.data.frame(proteomics)
+df_proteomics$pc1=pc1[as.character(proteomics$code)]
+df_proteomics$index=c(1:length(df_proteomics$pc1))
+df_proteomics=df_proteomics[order(df_proteomics$pc1, decreasing = T),]
+
+
+
+```
+
+```{r}
+
+pc1_animals=pc1_animals[-(which(names(pc1_animals)==proteomics$code[which(proteomics$Animal=="TG_NT.5.1")]))]
+correlations=apply(assay(mixed_imputation),1,FUN=function(x)(cor(x, pc1_animals, method="spearman")))
+
+correlations_ps=rep(NA, dim(assay(mixed_imputation))[1])
+for(i in 1:length(correlations_ps)){
+  correlations_ps[i]=cor.test(assay(mixed_imputation)[i,], pc1_animals, method="spearman")$p.value
+}
+
+correlations_ps_adj=p.adjust(correlations_ps, method="BH")
+de_corr=unique(names(correlations[which(correlations_ps<0.005)]))
+de_corr=unique(sapply(de_corr, FUN =function(x)(strsplit(x, split=" ", fixed=T)[[1]][2])))
+# x=list(rescued_pep_egcg, rescued_pep_ee, rescued_pep_egcgee)
+# 
+# y=list(rescued_phospho_egcg, rescued_phospho_ee, rescued_phospho_egcgee)
+
+```
+
+
+
+```{r}
+mat4=cbind(detect_enrichment(lista_de_proteome, universe_for_overlap, de_corr))
+
+
+
+
+mat4o=cbind(detect_enrichment2(lista_de_proteome, de_corr))
+```
+
+
+
+### Principal Component Analalysis
+
+The PCA is made taking into account data measured upon a Novel Object Recognition test:
+
+* SA = Spontaneous Alternation
+* %Familiar = Percentage of time spent with the familiar objet
+* %Novel = Percentage of time spent with the novel object
+* DI = Discrimination Index --> (time novel-time familiar)/total time   x  100
+* Distance/Activity
+
+```{r}
+biplot2.default=function(x, y, var.axes = TRUE, col, cex = rep(par("cex"), 2), 
+          xlabs = NULL, ylabs = NULL, expand = 1, xlim = NULL, ylim = NULL, 
+          arrow.len = 0.1, main = NULL, sub = NULL, xlab = NULL, ylab = NULL, col_samples, col_labels,
+          ...) 
+{
+  n <- nrow(x)
+  p <- nrow(y)
+  if (missing(xlabs)) {
+    xlabs <- dimnames(x)[[1L]]
+    if (is.null(xlabs)) 
+      xlabs <- 1L:n
+  }
+  xlabs <- as.character(xlabs)
+  dimnames(x) <- list(xlabs, dimnames(x)[[2L]])
+  if (missing(ylabs)) {
+    ylabs <- dimnames(y)[[1L]]
+    if (is.null(ylabs)) 
+      ylabs <- paste("Var", 1L:p)
+  }
+  ylabs <- as.character(ylabs)
+  dimnames(y) <- list(ylabs, dimnames(y)[[2L]])
+  if (length(cex) == 1L) 
+    cex <- c(cex, cex)
+  if (missing(col)) {
+    col <- par("col")
+    if (!is.numeric(col)) 
+      col <- match(col, palette(), nomatch = 1L)
+    col <- c(col, col + 1L)
+  }
+  else if (length(col) == 1L) 
+    col <- c(col, col)
+  unsigned.range <- function(x) c(-abs(min(x, na.rm = TRUE)), 
+                                  abs(max(x, na.rm = TRUE)))
+  rangx1 <- unsigned.range(x[, 1L])
+  rangx2 <- unsigned.range(x[, 2L])
+  rangy1 <- unsigned.range(y[, 1L])
+  rangy2 <- unsigned.range(y[, 2L])
+  if (missing(xlim) && missing(ylim)) 
+    xlim <- ylim <- rangx1 <- rangx2 <- range(rangx1, rangx2)
+  else if (missing(xlim)) 
+    xlim <- rangx1
+  else if (missing(ylim)) 
+    ylim <- rangx2
+  ratio <- max(rangy1/rangx1, rangy2/rangx2)/expand
+  on.exit(par(op))
+  op <- par(pty = "s")
+  if (!is.null(main)) 
+    op <- c(op, par(mar = par("mar") + c(0, 0, 1, 0)))
+  plot(x, type = "n", xlim = xlim, ylim = ylim, col = col_samples, 
+       xlab = xlab, ylab = ylab, sub = sub, main = main, ...)
+  text(x, xlabs, cex = cex[1L], col = col_samples, ...)
+  par(new = TRUE)
+  dev.hold()
+  on.exit(dev.flush(), add = TRUE)
+  plot(y, axes = FALSE, type = "n", xlim = xlim * ratio, ylim = ylim * 
+         ratio, xlab = "", ylab = "", col = col_samples, ...)
+  axis(3, col = col[2L], ...)
+  axis(4, col = col[2L], ...)
+  box(col = col[1L])
+  text(y, labels = ylabs, cex = cex[2L], col = col_labels, ...)
+  if (var.axes) 
+    arrows(0, 0, y[, 1L] * 0.8, y[, 2L] * 0.8, col = col_labels, 
+           length = arrow.len)
+  invisible()
+}
+
+
+
+
+
+biplot2.prcomp=function (x, choices = 1L:2L, scale = 1, pc.biplot = FALSE, ...) 
+{
+  if (length(choices) != 2L) 
+    stop("length of choices must be 2")
+  if (!length(scores <- x$x)) 
+    stop(gettextf("object '%s' has no scores", deparse(substitute(x))), 
+         domain = NA)
+  if (is.complex(scores)) 
+    stop("biplots are not defined for complex PCA")
+  lam <- x$sdev[choices]
+  n <- NROW(scores)
+  lam <- lam * sqrt(n)
+  if (scale < 0 || scale > 1) 
+    warning("'scale' is outside [0, 1]")
+  if (scale != 0) 
+    lam <- lam^scale
+  else lam <- 1
+  if (pc.biplot) 
+    lam <- lam/sqrt(n)
+  biplot2.default(t(t(scores[, choices])/lam), t(t(x$rotation[, 
+                                                             choices]) * lam), ...)
+  invisible()
+}
+
+```
+
+
+
+```{r}
+correspondences=as.data.frame(correspondences)
+wt_samples=which(correspondences$Conditions=="WT")
+wtegcg_samples=which(correspondences$Conditions=="WT_EGCG")
+
+tg_samples=which(correspondences$Conditions=="TG")
+tgegcg_samples=which(correspondences$Conditions=="TG_EGCG")
+
+# pc_copy=pc
+# 
+# pc_copy$x=cbind(c(mean(pc$x[,1][wt_samples]),mean(pc$x[,1][wtegcg_samples]),mean(pc$x[,1][wtee_samples]),mean(pc$x[,1][wtegcgee_samples]),
+#      mean(pc$x[,1][tg_samples]),mean(pc$x[,1][tgegcg_samples]),mean(pc$x[,1][tgee_samples]),mean(pc$x[,1][tgegcgee_samples]) )
+# ,
+# c(mean(pc$x[,2][wt_samples]),mean(pc$x[,2][wtegcg_samples]),mean(pc$x[,2][wtee_samples]),mean(pc$x[,2][wtegcgee_samples]),
+#      mean(pc$x[,2][tg_samples]),mean(pc$x[,2][tgegcg_samples]),mean(pc$x[,2][tgee_samples]),mean(pc$x[,2][tgegcgee_samples]) ))
+# 
+# 
+# 
+# par(mfrow=c(1,1),mar=c(4,4,2,2))
+# biplot2.prcomp(pc_copy, scale=0, col_samples = rep(c("blue", "green", "goldenrod1", "purple"),2), col_labels=rainbow(dim(behaviour)[2]),xlab=paste("PC1 (", round(prop_varex[1]*100,2), "%)", sep=""), ylab=paste("PC2 (", round(prop_varex[2]*100,2), "%)", sep=""),xlabs=c(rep("WT",4),rep("TG",4)))
+#legend("topright", legend=c("H20", "EGCG","EE","EGCG+EE"), fill=c("blue", "green", "goldenrod1", "purple"), bty="n")
+```
+
+
+
+
+
+
+
+## Correlating proteins
+
+We detected `r length(de_corr)` correlating proteins.
+
+
+
+```{r, fig.width = 11, fig.height=7}
+#  colnames(mat4)=c("proteome")
+# 
+# require(gplots)
+# require(RColorBrewer)
+# require(grDevices)
+# heatmap.2(mat4, dendrogram="none", scale="none", density.info="none", trace="none", col=rev(colorRampPalette(brewer.pal(9, "OrRd"))(256)), main=NULL, Rowv=FALSE, Colv=rev("Rowv"), cex.axis=.5, cexRow=.9, cexCol=.9, cellnote=round(mat4o,3), keysize=1,key.xlab ="p-value Fisher test",margins=c(2,18),srtCol=0)
+
+
+
+# heatmap.2(mat1a[c(1,5:7,11:13),], dendrogram="none", scale="none", density.info="none", trace="none", col=colorRampPalette(brewer.pal(9, "OrRd"))(256), main="Overlap with correlating genes", Rowv=FALSE, Colv=rev("Rowv"), cex.axis=.5, cexRow=.9, cexCol=.9, cellnote=round(mat[c(1,5:7,11:13),],2), keysize=1,key.xlab ="p-value Fisher test",margins=c(2,18),srtCol=0)
+#overlap with the overall list! load conv_last
+#pca with the overlap??
+```
+
+
+
+
+
+
+```{r, fig.height=10, fig.width=10}
+library(igraph)
+corr_ens=mapped$STRING_id[which(as.character(mapped$list_wttg) %in% unique(c(de_corr)))]
+
+V(graph_joint)$frame.color <- ifelse(V(graph_joint)$name %in% corr_ens, "red", "black")
+
+
+
+V(graph_joint)$color <- ifelse(V(graph_joint)$name %in% TG, "green", "white")
+
+# V(graph_joint)$color <- ifelse(V(graph_joint)$name %in% EGCG, "lightsteelblue2", "white")
+# V(graph_joint)$color[(V(graph_joint)$name %in% EE)] = "yellow"
+# V(graph_joint)$color[(V(graph_joint)$name %in% EGCGEE)] = "red"
+# V(graph_joint)$color[(V(graph_joint)$name %in% EGCGandEE)] = "green"
+# V(graph_joint)$color[(V(graph_joint)$name %in% EGCGEEandEGCG)] = "purple"
+# V(graph_joint)$color[(V(graph_joint)$name %in% EGCGEEandEE)] = "orange"
+# V(graph_joint)$color[(V(graph_joint)$name %in% EGCGEEandEGCGandEE)] = "black"
+V(graph_joint)$shape <- ifelse(V(graph_joint)$name %in% proteome_ens, "circle", "circle")
+V(graph_joint)$size <- ifelse(V(graph_joint)$name %in% seed_ens, 5,2.5)
+V(graph_joint)$label.color <- ifelse(V(graph_joint)$name %in% highly_interacting, "red", "black")
+E(graph_joint)$color[1:length(E(graph_joint))] = "gray"
+# E(graph_joint)$width[1:length(E(graph_joint))] = .75
+
+E(graph_joint)$width=E(graph_joint)$weight/400
+V(graph_joint)$label.color[(V(graph_joint)$name %in% intersect(highly_interacting, dyrk1a_targets_ens))] = "blue"
+# E(graph_joint)$color[intersect(which(interaction_joint$V1 %in% proteome_ens),which(interaction_joint$V2 %in% proteome_ens))]="red"
+# E(graph_joint)$color[intersect(which(interaction_joint$V1 %in% phospho_ens),which(interaction_joint$V2 %in% phospho_ens))]="blue"
+# E(graph_joint)$color[unique(intersect(which(interaction_joint$V1 %in% phospho_ens),which(interaction_joint$V2 %in% proteome_ens)),
+#                             intersect(which(interaction_joint$V1 %in% proteome_ens),which(interaction_joint$V2 %in% phospho_ens)))]="purple"
+
+E(graph_joint)$color[c(which(as.character(interaction_joint$V1) %in% proteome_ens),which(as.character(interaction_joint$V2) %in% proteome_ens))]="pink"
+
+
+
+
+
+dyrk1tgt=getBM(attributes=c("ensembl_peptide_id", "mgi_symbol"),filters="ensembl_peptide_id", values=unlist(lapply(dyrk1a_targets_ens, FUN=function(x)(substring(x,7)))), mart = mouse)
+hubs=getBM(attributes=c("ensembl_peptide_id", "mgi_symbol"),filters="ensembl_peptide_id", values=unlist(lapply(highly_interacting, FUN=function(x)(substring(x,7)))), mart = mouse)
+
+dyrk1tgt$nodes=paste("10090", dyrk1tgt$ensembl_peptide_id, sep=".")
+
+hubs$nodes=paste("10090", hubs$ensembl_peptide_id, sep=".")
+
+label_names=rep(NA,vcount(graph_joint))
+
+for(es in 1:length(dyrk1tgt$nodes)){
+  label_names[which(V(graph_joint)$name == dyrk1tgt$nodes[es])]=dyrk1tgt$mgi_symbol[es]
+}
+
+for(es in 1:length(hubs$nodes)){
+  label_names[which(V(graph_joint)$name == hubs$nodes[es])]=hubs$mgi_symbol[es]
+}
+
+
+```
+
+```{r}
+     #########################################
+      ## ppi_enrichment
+      #########################################
+postFormSmart <- function(uri, ..., .params = list(), .opts = curlOptions(url = uri),
+                          curl = getCurlHandle(), style = 'HTTPPOST',
+                          .encoding = integer(), binary = NA, .checkParams = TRUE,
+                          .contentEncodeFun = curlEscape){
+
+    res = postForm(uri, ..., .params = .params, .opts = .opts,
+             curl = curl, style = style,
+             .encoding = .encoding, binary = binary, .checkParams = .checkParams,
+             .contentEncodeFun = .contentEncodeFun)
+  
+    
+    suppressWarnings( if(grepl("The document has moved", res)){
+    
+      begin <- regexpr("href",res)+6
+      mys2=substr(res, begin, 10000000)
+      end <- regexpr('"',mys2)-1
+      uriNew = substr(mys2, 1, end)
+      
+      res=postForm(uriNew, ..., .params = .params, .opts = .opts,
+               curl = curl, style = style,
+               .encoding = .encoding, binary = binary, .checkParams = .checkParams,
+               .contentEncodeFun = .contentEncodeFun)
+    } )
+    
+    return(res)
+  
+}
+      ppi_enrichment = function(string_ids, required_score=NULL){
+
+'
+Description:
+  Queries STRING server for protein-protein interaction enrichment
+
+Input parameters:
+  "string_ids"      a vector of STRING identifiers.
+
+Author(s):
+   Damian Szklarczyk
+'
+stable_url = "character"
+backgroundV = "vector"
+          if (is.null(required_score)) required_score = score_threshold
+
+          urlStr <- paste(stable_url, "/api/tsv-no-header/ppi_enrichment", sep="")
+
+          identifiers = ""
+
+          for(id in string_ids) {
+            identifiers = paste(identifiers, id, sep="%0d")
+          }
+
+
+         if(length(backgroundV)==0) {
+
+             params = list(species=species, identifiers=identifiers, required_score=required_score)
+
+         } else {
+
+             background = ""
+             for(id in backgroundV) {
+               background = paste(background, id, "%0d", sep="")
+             }
+             params = list(species=species, identifiers=identifiers, background_string_identifiers=background, required_score=required_score)
+         }
+ 
+
+          tempDfv=postFormSmart(urlStr, .params=params)
+
+          answer = read.table(text=tempDfv, sep="\t", stringsAsFactors=FALSE, quote="", fill=TRUE, header=FALSE)
+
+          result = list(enrichment = answer$V6, edges=answer$V2, lambda=answer$V5)
+  
+          return(result)
+      }
+ 
+```
+
+
+```{r, cache=F}
+require(igraph)
+require(STRINGdb)
+graph_total=string_db$get_graph()
+toadd=unique(c(as.character(interaction_binary$V1), as.character(interaction_binary$V2)))
+toadd=as.data.frame(toadd)
+mapped2 <- string_db$map( toadd, "toadd", removeUnmappedRows = FALSE )
+
+for(l in 1:dim(interaction_binary)[1]){
+  v1[l]=mapped2$STRING_id[which(mapped2$toadd %in% as.character(interaction_binary$V1[l]) )]
+  v2[l]=mapped2$STRING_id[which(mapped2$toadd %in% as.character(interaction_binary$V2[l]) )]
+}
+
+interaction_added_ens2=cbind(v1,v2)
+
+interaction_added_ens2=interaction_added_ens2[complete.cases(interaction_added_ens2),]
+
+graph_aloy=graph_from_data_frame(as.data.frame(interaction_added_ens2), directed = FALSE, vertices = NULL)
+
+
+graph_TOT=(graph_total %u% graph_aloy)
+
+graph_TOT=igraph::simplify(graph_TOT)
+
+# enrichment = STRINGdb$get_ppi_enrichment(mapped$STRING_id)
+# enrichment_seed = STRINGdb$get_ppi_enrichment(seed_ens)
+
+sub=induced_subgraph(graph_joint, intersect(V(graph_joint)$name, seed_ens))
+```
+
+
+## Plotting the network
+
+We plotted the network of interactions using a different node size if the proteins were seeds (large nodes), that are the ones originally present in the DE+DP list, or  interactors (small nodes).
+
+Levels of blue indicate how many treatment are rescuing a given protein.
+
+Proteins changing their abundances were represented with circles, proteins changing their phosphorylation levels with squares, protein changing both their abundances and phosphorylation levels with triangles.
+
+Names of Dyrk1A targets and hubs are printed out. Black: DYRK1A targets. Red: hubs. Blue: both DYRK1A targets and hubs.
+
+Edges indicating a bona fide interaction from Aloy's database were drawn thicker.
+
+Edge colors were red for indicating an interaction between two proteins changing in their abundance, in blue indicating two proteins changing their phosphorylation levels, and in purple for indicating an interaction between a protein changing in abundance and another changing in phosphorylation level.
+
+
+
+```{r, fig.height=10, fig.width=10}
+
+
+par(mar=c(0,0,0,8))
+set.seed(1)
+plot(graph_joint,vertex.label=label_names, layout=layout.davidson.harel, vertex.label.cex=1.5)
+
+par(mar=c(0,0,0,0))
+par(xpd=TRUE)
+legend("topleft",
+c("EGCG"), bty="n",
+fill=c("green"), cex=1, title="rescued by:")
+
+legend("topright", 
+       c("proteome"), bty="n",
+       col=c("pink"), cex=1, title="interaction:",pch="_",lwd=3)
+
+
+
+legend("bottomright", 
+       c("seed", "interactor"), bty="n",pt.cex=c(2,1),
+       pch=0, title="source:",cex=1)
+legend("bottom", 
+       c("hubs", "DYRK1A targets"), bty="n",
+      pch="x",cex=1, col = c("red", "black"))
+
+# pdf("Figure3.pdf", width = 10, height = 10)
+# par(mar=c(0,0,0,8))
+# set.seed(1)
+# plot(graph_joint,vertex.label=label_names, layout=layout.davidson.harel, vertex.label.cex=1.5)
+# 
+# par(mar=c(0,0,0,0))
+# par(xpd=TRUE)
+# legend("topleft",
+# c("one combination", "two combinations", "three combinations", "not rescued"), bty="n",
+# fill=c("lightsteelblue1", "lightsteelblue3","blue", "green"), cex=1, title="rescued by:")
+# 
+# legend("topright", 
+#        c("proteome", "phospho", "phospho-proteome"), bty="n",
+#        col=c("pink", "cyan", "magenta"), cex=1, title="interaction:",pch="_",lwd=3)
+# 
+# legend("bottomleft", 
+#        c("proteome", "phospho", "proteome&phospho"), bty="n",cex=1,
+#        pch=c(1,0,2), title="deregulated in:")
+# legend("top", 
+#        c("correlating"), bty="n",
+#       pch=c(0), col = "red")
+# legend("bottomright", 
+#        c("seed", "interactor"), bty="n",pt.cex=c(2,1),
+#        pch=0, title="source:",cex=1)
+# legend("bottom", 
+#        c("hubs", "DYRK1A targets", "Hubs and DYRK1A targets"), bty="n",
+#       pch="x",cex=1, col = c("red", "black", "blue"))
+# dev.off()
+
+
+```
+
+#### Network colored for WT
+
+```{r networkwithwt, fig.height=10, fig.width=10}
+
+V(graph_joint)$color <- ifelse(V(graph_joint)$name %in% WT, "green", "white")
+
+V(graph_joint)$color[(V(graph_joint)$name %in% WTimpaired)] = "darkgreen"
+
+par(mar=c(0,0,0,8))
+set.seed(1)
+plot(graph_joint,vertex.label=label_names, layout=layout.davidson.harel, vertex.label.cex=1.5)
+
+par(mar=c(0,0,0,0))
+par(xpd=TRUE)
+legend("topleft",
+c("changing in WT", "impaired in WT"), bty="n",
+fill=c("green", "darkgreen"), cex=1)
+
+legend("topright", 
+       c("proteome"), bty="n",
+       col=c("pink"), cex=1, title="interaction:",pch="_",lwd=3)
+
+
+legend("bottomright", 
+       c("seed", "interactor"), bty="n",pt.cex=c(2,1),
+       pch=0, title="source:",cex=1)
+legend("bottom", 
+       c("hubs", "DYRK1A targets" ), bty="n",
+      pch="x",cex=1, col = c("red", "black"))
+
+protid_seed=unique(c(lista_de_proteome[[1]]))
+protid_rescued=unique(c(unlist(rescued_proteome)))
+protid_tg=unique(c(lista_de_proteome$`TG.EGCG-TG.NT`, lista_de_proteome$`TG.EE-TG.NT`, lista_de_proteome$`TG.EGCG_EE-TG.NT`))
+
+```
+
+`r round(length(intersect(protid_rescued, protid_tg))/length(protid_tg),2)*100` % of the protein changing in TG are rescued proteins, `r round(length(setdiff(intersect(protid_seed, protid_tg), protid_rescued))/length(protid_tg),2)*100`are deregulated in TG mice but not rescued, while the other are on other targets.
+
+
+When looking at the network `r round(length(intersect(intersect(nodes, seed_ens), rescued_ens))/length(intersect(nodes, seed_ens)),2)*100` % of the nodes were rescued, and only `r round(length(intersect(intersect(nodes, seed_ens), setdiff(TG,rescued_ens)))/length(intersect(nodes, seed_ens)),2)*100` were not rescued.
+
+Dyrk1a targets in blue.
+
+```{r, fig.height=10, fig.width=10}
+
+color_names=rep("black",vcount(graph_joint))
+color_names[(V(graph_joint)$name %in% dyrk1a_targets_ens)]="blue"
+
+color_names[(V(graph_joint)$name %in% corr_ens)]="red"
+color_names[(V(graph_joint)$name %in% intersect(dyrk1a_targets_ens, corr_ens))]="purple"
+
+
+nodes=getBM(attributes=c("ensembl_peptide_id", "mgi_symbol"),filters="ensembl_peptide_id", values=unlist(lapply(V(graph_joint)$name, FUN=function(x)(substring(x,7)))), mart = mouse)
+
+nodes=nodes[!duplicated(nodes$ensembl_peptide_id),]
+nodes$nodes=paste("10090", nodes$ensembl_peptide_id, sep=".")
+
+label_names2=rep(NA,vcount(graph_joint))
+
+for(es in 1:length(nodes$nodes)){
+  label_names2[which(V(graph_joint)$name == nodes$nodes[es])]=nodes$mgi_symbol[es]
+}
+
+par(mar=c(0,0,0,8))
+set.seed(1)
+plot(graph_joint,vertex.label=label_names2, layout=layout.davidson.harel, vertex.label.cex=.75, vertex.label.color=color_names)
+
+par(mar=c(0,0,0,0))
+par(xpd=TRUE)
+legend("topleft",
+c("EGCG"), bty="n",
+fill=c("green"), cex=1, title="rescued by:")
+
+legend("topright", 
+       c("proteome"), bty="n",
+       col=c("pink"), cex=1, title="interaction:",pch="_",lwd=3)
+
+
+legend("bottomright", 
+       c("seed", "interactor"), bty="n",pt.cex=c(2,1),
+       pch=0, title="source:",cex=1)
+
+
+```
+
+
+
+```{r, fig.height=8}
+par(mar=c(5,8,4,2))
+barplot(c(mean(igraph::degree(graph_joint)),
+  mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% seed_ens)]]),
+  mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( !(names(igraph::degree(graph_joint)) %in% seed_ens))]]),
+  mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% proteome_ens)]]),
+
+  mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% rescued_ens)]]),
+    mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% setdiff(TG,rescued_ens))]]),
+    mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% TG)]]),
+    mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% WT)]]),
+ mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% corr_ens)]]),
+    mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% dyrk1a_targets_ens)]]),
+  mean(igraph::degree(graph_joint)[names(igraph::degree(graph_joint))[which( names(igraph::degree(graph_joint)) %in% highly_interacting)]])),
+  names.arg=c("all", "seed", "interactors", "proteome",  "rescued", "not rescued", "changing in TG", "changing in WT", "correlating", "DYR1A targets", "hubs"), las=2, horiz=T
+  , main="Average node degree")
+
+```
+
+Proteins with pval 0.1 :
+
+
+```{r}
+
+tab=head(ranking[,-c(1,2)],44)
+tab_full=head(ranking,44)
+names(tab)=c("Interactions (n)", "p-values", "Symbol", "Description")
+tab$Rescued=rep("",44)
+tab$Seed=rep("",44)
+tab$`DYRK1A target`=rep("",44)
+tab$Rescued[which(tab_full$Var1 %in% rescued_ens)]="yes"
+tab$Seed[which(tab_full$Var1 %in% seed_ens)]="yes"
+tab$Correlating[which(tab_full$Var1 %in% corr_ens)]="yes"
+tab$`DYRK1A target`[which(tab_full$Var1 %in% dyrk1a_targets_ens)]="yes"
+
+kable(tab, "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+
+
+
+
+## Rescued proteins
+
+
+
+```{r}
+changing_by_egcg=unique(c( 
+                          lista_de_proteome$`TG.EGCG-TG.NT`))
+
+rescued_by_egcg=unique(c(
+        lista_de_proteome$`rescued by EGCG`))
+
+
+
+notrescued_egcg=unique(setdiff(changing_by_egcg, rescued_by_egcg))
+
+wt_egcg=unique(c( lista_de_proteome$`WT.EGCG-WT.NT`))
+
+
+```
+
+
+
+
+## Recovery
+
+
+I calculated the fraction of how much a protein is recovered as:
+
+(GAP - (GAP not Rescued))/(initial GAP).
+
+Where the initial GAP is given by "TG.NT - WT.NT", While the "GAP not Rescued"" by "TG.T - WT.NT"
+
+Note that once WT.NT is set to 1:
+
+* TG.NT-WT.NT contrast can be simplified by TG.NT - 1
+* TG.T - WT.NT = (TG.NT-WT.NT)+ (TG.T-TG.NT)= TG.T -1
+
+And so:
+
+[(TG.NT - 1) - (TG.T-1)]/ (TG.NT - 1)= (TG.NT - TG.T)/(TG.NT -1)= [(TG.NT/WT.NT) - (TG.NT/WT.NT * TG.T/TG.NT)]/(TG.NT/WT.NT -1)
+
+Fraction of recovery could go from 0 (no recovery) to 1 (100% recovery). A value >1 indicate overcorrection. A value < 0 an impairment.
+
+
+### Proteome
+
+#### Distribution of recovery
+
+```{r, fig.width=10}
+par(mfrow=c(1,2))
+for(i in 1){
+  hist(mat_recovery_proteome[,i], breaks=100, main=colnames(mat_recovery_proteome)[i], xlab= "fold change WT.T-WT.NT")
+}
+
+for(i in 2){
+  hist(mat_recovery_proteome[,i], breaks=100, main=colnames(mat_recovery_proteome)[i], xlab= "% recovery")
+}
+
+```
+
+
+#### Statistics
+
+```{r, fig.height=8.5, fig.width=5}
+par(mfrow=c(3,2))
+
+barplot(c(length(intersect(which(mat_recovery_proteome[,2] <=1.5), which((mat_recovery_proteome[,2]>=0.5))))), names.arg=c("EGCG"), main= "rescued protein 50-150%", col=c("green"), ylim=c(0, max(c(length(intersect(which(mat_recovery_proteome[,2] <=1.5), which((mat_recovery_proteome[,2]>=0.5)))),length(intersect(which(mat_recovery_proteome[,1] <=1.5), which((mat_recovery_proteome[,1]>=0.5))))))))
+
+
+barplot(c(length(intersect(which(mat_recovery_proteome[,1] <=1.5), which((mat_recovery_proteome[,1]>=0.5))))), names.arg =c("EGCG"), main= "fold change WT.T-WT.NT: 50-150%", col=c("green"), ylim=c(0, max(c(length(intersect(which(mat_recovery_proteome[,1] <=1.5), which((mat_recovery_proteome[,1]>=0.5))))))))
+barplot(c(length( which(mat_recovery_proteome[,2]>1.5))), names.arg=c("EGCG"), main= "overcorrection>150%", col=c("green"), ylim=c(0, max(length( which(mat_recovery_proteome[,2]>1.5)))))
+
+
+barplot(c(length( which(mat_recovery_proteome[,1]>1.5))), names.arg=c("EGCG"), main= "fold change WT.T-WT.NT: >150%", col=c("green"), ylim=c(0, max(length( which(mat_recovery_proteome[,2]>1.5)))))
+
+
+
+barplot(c(length( which(mat_recovery_proteome[,2]<(-0.5)))), names.arg=c("EGCG"), main= "impairing >50%", col=c("green"), ylim=c(0, max(length( which(mat_recovery_proteome[,2]<(-0.5))))))
+
+
+barplot(c(length( which(mat_recovery_proteome[,1]<0.5))), names.arg=c("EGCG"), main= "fold change WT.T-WT.NT: <150%", col=c("green"), ylim=c(0, max(length( which(mat_recovery_proteome[,2]<(-0.5))),
+                                                                                                                                                                                              length( which(mat_recovery_proteome[,1]<0.5)))))
+
+```
+
+
+#### Deviations
+
+
+```{r, fig.width=10}
+par(mfrow=c(1,1))
+
+boxplot(abs(mat_comparison_proteome), col=c("blue", "green", "green"), border=c("black", "red", "black"), main="mean log2 deviation from WT.NT")
+
+colMeans(abs(mat_comparison_proteome), na.rm=T)
+```
+
+
+```{r}
+#save.image("temp.rda")
+```
+
+#### Overall view
+
+On the left: log2 FC relative to wild type (orange= downregulated, blue/green="upregulated"). White=NA.
+Light yellow values indicate rescued level (log2FC to WT.NT is near 0).
+
+On the right:
+
+* impairment in levels: proportional gradient of green
+* No effect: yellow towards orange
+* 50-100% recovery: orange towards red
+* 100% -150% recovery: red towards pink
+* overcorrection >150% cyan towards blue
+
+
+```{r, fig.show="hide", fig.width = 12, fig.height=12}
+darkgreengreen=colorRampPalette(c("darkgreen", "green"))
+
+yellorange=colorRampPalette(c("yellow", "orange"))
+orangered=colorRampPalette(c("orange", "red"))
+red_pink=colorRampPalette(c("red", "pink"))
+
+greenyell=colorRampPalette(c("green", "yellow"))
+redblue=colorRampPalette(c("cyan", "blue"))
+palette_rec=c(darkgreengreen(25), yellorange(25), orangered(25), red_pink(25),redblue(25))
+breaks=c(seq(min(mat_recovery_proteome[,2],na.rm = T),0,length=26),
+         seq(0,0.5,length=26),
+         seq(0.5,1,length=26),
+         seq(1,1.5,length=26),
+         seq(1.5,max(mat_recovery_proteome[,2],na.rm = T),length=26)
+)
+
+colnames(mat_recovery_proteome)[2]=c("EGCG")
+
+
+breaks1=c( seq(min(mat_comparison_proteome,na.rm = T), min(fc_tgwt),length=4),
+          
+          seq(min(fc_tgwt), max(fc_tgwt),length=251),
+         
+          seq(max(fc_tgwt), max(mat_comparison_proteome,na.rm = T),length=4)
+)
+require(gplots)
+library(gridGraphics)
+library(grid)
+grab_grob <- function(){
+  grid.echo()
+  grid.grab()
+}
+require(gridExtra)
+require(RColorBrewer)
+arr=list(mat_comparison_proteome[,c(1,3)], mat_recovery_proteome[ordering_proteome,2])
+colori=list(colorRampPalette(brewer.pal(9, "Spectral"))(256), palette_rec)
+rotture=list(unique(breaks1), unique(breaks))
+margini=list(c(2,2),c(2,25))
+keyxlab=c("log2FC to WT.NT","% recovery")
+
+  heatmap.2(as.matrix(arr[[1]]),  scale="none", density.info="none", trace="none", dendrogram="none",
+            col=colori[[1]], main="",Rowv=FALSE,
+            cex.axis=.5, cexRow=.9, cexCol=.9, keysize=1,key.xlab =keyxlab[1],margins=margini[[1]] ,srtCol=0, Colv =FALSE, lhei=c(1,7), labRow  = rep("",dim(mat_comparison_proteome)[1]) , breaks=rotture[[1]])
+
+```
+
+
+## More on hubs
+
+```{r}
+find_double_int=function(lista, subset_proteins){
+  mat=matrix(rep(NA,length(lista)*length(lista)), length(lista),length(lista)) #overlap coef
+  rownames(mat)=names(lista)
+  colnames(mat)=names(lista)
+  for (o in 1:length(lista)){
+    for (n in 1:length(lista)){
+      
+      op=lista[[o]]
+      np=lista[[n]]
+      
+      mat[o,n]=length(intersect(intersect(op,np), subset_proteins))
+      
+    }}
+  
+  for(righe in 1:length(rownames(mat))){
+    for(colonne in 1:length(colnames(mat))){
+      
+      if(righe < colonne){
+        mat[righe, colonne]=NA
+        
+      }}}
+  
+  mat2=matrix(rep(NA,length(lista)*length(lista)), length(lista),length(lista)) #overlap coef
+  rownames(mat2)=names(lista)
+  colnames(mat2)=names(lista) 
+  
+  rownames(mat2)=names(lista)
+  colnames(mat2)=names(lista)
+  for (o in 1:length(lista)){
+    for (n in 1:length(lista)){
+      
+      op=lista[[o]]
+      np=lista[[n]]
+      
+      mat2[o,n]=length(intersect(intersect(op,np), subset_proteins))/length(intersect(op,np))
+      
+    }}
+  
+  for(righe in 1:length(rownames(mat2))){
+    for(colonne in 1:length(colnames(mat2))){
+      
+      if(righe < colonne){
+        mat2[righe, colonne]=NA
+        
+      }}}
+  
+  return(list(mat, mat2))
+}
+
+
+```
+
+```{r}
+
+hubs_list=rep(list(NA), length(highly_interacting))
+
+for(i in 1:length(hubs_list)){
+  
+  indici=unique(c(which(interaction_joint$V1 %in% highly_interacting[i]),which(interaction_joint$V2 %in% highly_interacting[i])))
+  hubs_list[[i]]=unique(c(as.character(interaction_joint$V1[indici]),as.character(interaction_joint$V2[indici])))
+}
+
+
+
+
+hubs=getBM(attributes=c("ensembl_peptide_id", "mgi_symbol"),filters="ensembl_peptide_id", values=unlist(lapply(highly_interacting, FUN=function(x)(substring(x,7)))), mart = mouse)
+
+
+hubs$nodes=paste("10090", hubs$ensembl_peptide_id, sep=".")
+
+
+names_hubs=rep(NA,length(highly_interacting))
+
+
+for(i in 1:length(highly_interacting)){
+  names_hubs[i]=hubs$mgi_symbol[which(hubs$nodes %in% highly_interacting[i])]
+}
+
+names(hubs_list)=names_hubs
+
+mat_hubs=create_overlap_matrix(lista = hubs_list, universo = rep(list(mapped$STRING_id),length(hubs_list)))
+
+mat_hubs_rescued=find_double_int(hubs_list, subset_proteins = rescued_ens)
+
+
+mat_hubs_dyrk=find_double_int(hubs_list, subset_proteins = dyrk1a_targets_ens)
+
+```
+
+
+```{r}
+arr=list(mat_hubs, mat_hubs_rescued, mat_hubs_dyrk)
+titles=c("Hubs' interactions", "Rescued in Hubs' interactions", "DYRK1A targets in hub's interactions")
+```
+
+```{r, fig.show="hide", fig.width = 15, fig.height=13}
+keysxlab=c("p-value Fisher test", "% rescued", "% DYRK1A targets")
+indexes1=c(1,2,2)
+indexes2=c(2,1,1)
+library(gridExtra)
+library(gridGraphics)
+library(grid)
+library(RColorBrewer)
+library(gplots)
+grid.newpage()
+
+gl <- lapply(1:3, function(i){
+heatmap.2(arr[[i]][[indexes1[i]]], dendrogram="none", scale="none", density.info="none", trace="none", col=rev(colorRampPalette(brewer.pal(9, "OrRd"))(256)), key.title="", Rowv=FALSE, Colv=rev("Rowv"), cex.axis=.5, cexRow=.9, 
+          cexCol=.9,cellnote=round(arr[[i]][[indexes2[i]]],2), keysize=.75,key.xlab =keysxlab[i],margins=c(14,12),srtCol=45, 
+          breaks=c(seq(0,1,length=257)), main=titles[i],lhei=c(1,7))
+  grab_grob()
+})
+```
+
+
+```{r, fig.width = 20, fig.height=7}
+
+grid.arrange(grobs=gl,ncol=3,  clip=TRUE)
+
+```
+
+
+
+```{r, fig.width = 10}
+
+
+
+tgt=unique(c(lista_de_proteome$`TG.EGCG-TG.NT`))
+wtt=unique(c(lista_de_proteome$`WT.EGCG-WT.NT`))
+int=unique(c(lista_de_proteome$`(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)`))
+
+
+a=data_proteomic$pwt_wtegcg
+b=data_proteomic$ptg_tgegcg
+subsettoEGCG=unique(c(lista_de_proteome$`TG.EGCG-TG.NT`,lista_de_proteome$`WT.EGCG-WT.NT`,lista_de_proteome$`(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)`))
+
+a=data_proteomic$pwt_wtegcg[subsettoEGCG,]
+
+b=data_proteomic$ptg_tgegcg[subsettoEGCG,]
+
+
+plot(b$log2FC, a$log2FC, type="n", xlab="TG.greentea - TG.NT (log2FC)", ylab="WT.greentea - WT.NT (log2FC)", main="")
+points(b$log2FC[which(!(rownames(b) %in% lista_de_proteome$`(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)`))],a$log2FC[which(!(rownames(a) %in% lista_de_proteome$`(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)`))], col="black", pch=16)
+points(b$log2FC[which(rownames(b) %in% lista_de_proteome$`(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)`)],a$log2FC[which(rownames(a) %in% lista_de_proteome$`(TG.EGCG-TG.NT)-(WT.EGCG-WT.NT)`)], col="red", pch=16)
+abline(v=0, h=0, lty="dashed")
+
+gldiff=grab_grob()
+
+
+```
+
+```{r savegraph}
+```
+
+
+
+
+```{r }
+load("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/conv_last.RData")
+
+a <- UniProt.ws::select(up, keys = unique(c(unlist(universe_proteomic))), columns=c("ENTREZ_GENE", "UNIPROTKB"),keytype = "UNIPROTKB")
+a$ENTREZ_GENE=sapply(a$ENTREZ_GENE, FUN =function(x)(gsub(" ", "",x)))
+A=getBM(attributes=c("uniprotswissprot", "entrezgene_id"),filters="uniprotswissprot", values=a$UNIPROTKB[is.na(a$ENTREZ_GENE)]
+, mart = mouse)
+
+unmapped=conv_last[which(conv_last$UNIPROTKB %in% setdiff(unique(a$UNIPROTKB[is.na(a$ENTREZ_GENE)]), unique(A$uniprotswissprot))),]
+
+colnames(A)=colnames(a)
+colnames(unmapped)=colnames(a)
+conversion=rbind(a, A)
+
+conversion=rbind(conversion, unmapped)
+conversion=conversion[complete.cases(conversion),]
+
+convert_to_entrez=function(lista, conversion){
+  lista_conv=lista
+  for(i in 1:length(lista)){
+    lista_conv[[i]]=unique(conversion$ENTREZ_GENE[which(conversion$UNIPROTKB %in% lista[[i]])])
+  }
+
+  return(lista_conv)
+}
+
+lista_for_enrichment=list(
+  "Proteome"=lista_de_proteome[[1]],
+  
+  "All rescued - proteome"=unique(c(lista_de_proteome[[5]]))
+)
+
+# protein_in_network=mapped$list_wttg[which(mapped$STRING_id %in% names(igraph::degree(graph_joint)))]
+# 
+# 
+# lista_for_enrichment=lapply(lista_for_enrichment, intersect, protein_in_network)
+
+lista_for_enrichment_entrez=convert_to_entrez(lista_for_enrichment, conversion)
+```
+
+```{r}
+require(clusterProfiler)
+require(ReactomePA)
+require("org.Mm.eg.db")
+universe=unique(c(unlist(universe_proteomic)))
+universe_e=unique(conversion$ENTREZ_GENE)
+
+```
+
+
+### GO analysis with expressed proteins
+
+```{r, go_analysis}
+
+
+
+cr_bp_all=compareCluster(geneCluster=lista_for_enrichment_entrez, fun="enrichGO", OrgDb=org.Mm.eg.db, universe=universe_e, ont="ALL", readable=T)
+```
+
+
+
+```{r, fig.width=12}
+cr_bp_all@compareClusterResult=cr_bp_all@compareClusterResult[,-2]
+
+cr_bp_all@compareClusterResult=cr_bp_all@compareClusterResult[which(cr_bp_all@compareClusterResult$p.adjust < 0.04),]
+
+cr_bp_all@compareClusterResult=cr_bp_all@compareClusterResult[which(cr_bp_all@compareClusterResult$Cluster %in% c("Proteome",  "All rescued - proteome")),]
+
+
+
+dotplot(cr_bp_all, showCategory=100, by="rowPercentage",label_format = 100)
+
+```
+
+```{r go1file}
+write.csv(cr_bp_all, file="cr_bp_all_cerebellum.csv")
+
+```
+
+
+
+### KEGG
+
+```{r}
+cr_k=compareCluster(geneCluster=lista_for_enrichment, keyType="uniprot", fun="enrichKEGG", organism="mmu", universe=unique(universe))
+write.csv(summary(cr_k), "p_cr_kegg_cerebellum.csv")
+
+```
+
+```{r, fig.width=9}
+dotplot(cr_k, showCategory=100, by="rowPercentage")
+```
+
+
+### Pathway analysis for the treatment
+
+```{r}
+impaired=mapped$list_wttg[which(as.character(mapped$list_wttg) %in% 
+                           unique(c(impaired_proteome_wt$EGCG)))]
+
+
+
+changing_by_treatment=unique(c(lista_de_proteome$`TG.EGCG-TG.NT`))
+
+rescued=c(
+        lista_de_proteome$`rescued by EGCG`)
+
+notrescued=unique(setdiff(changing_by_treatment, rescued))
+
+wt_treatment=unique(c(lista_de_proteome$`WT.EGCG-WT.NT`))
+not_rescued_tg=notrescued
+
+```
+
+```{r treat}
+common=intersect(changing_by_treatment, wt_treatment)
+interactions=unique(c(lista_de_proteome[[4]]))
+lista_for_enrichment=list(
+  "TG.EGCG-TG.NT"=changing_by_treatment,
+  "WT.EGCG-TG.NT"=wt_treatment,
+  "TG and WT"=common,
+  "Differently changing"=interactions,
+  "Only in TG"=setdiff(changing_by_treatment, wt_treatment),
+  "Only in WT"=setdiff(wt_treatment, changing_by_treatment),
+  "Not rescued"=not_rescued_tg,
+  "Impaired"=impaired,
+  "WT without impaired"=setdiff(wt_treatment,impaired)
+)
+
+
+lista_for_enrichment$`Similarly changing`=setdiff(setdiff(lista_for_enrichment$`TG and WT`,lista_for_enrichment$`Differently changing`), unique(c(lista_de_proteome[[5]] )))
+lista_for_enrichment_entrez=convert_to_entrez(lista_for_enrichment, conversion)
+```
+
+```{r venns6b}
+require(eulerr)
+# 
+vennc=plot(euler(list("TG and WT"=common, "Differently changing"=interactions)), shape = "ellipse", quantities = TRUE,adjust_labels=TRUE)
+# vennc=grab_grob()
+# 
+# 
+vennb=plot(euler(list("TG.EGCG-TG.NT"=changing_by_treatment, "WT.EGCG-WT.NT"=wt_treatment)), quantities = TRUE,adjust_labels=TRUE)
+
+```
+
+### GO analysis with expressed proteins
+
+```{r treat2,fig.width=19, fig.height=8.74}
+cr_bp_all2=compareCluster(geneCluster=lista_for_enrichment_entrez, fun="enrichGO", OrgDb=org.Mm.eg.db, universe=universe_e, ont="ALL", readable=T)
+```
+
+
+
+```{r plotreat,fig.width=10}
+
+
+cr_bp_all2@compareClusterResult=cr_bp_all2@compareClusterResult[,-2]
+cr_bp_all2_s=cr_bp_all2
+cr_bp_all2_s@compareClusterResult=cr_bp_all2_s@compareClusterResult[which(cr_bp_all2_s@compareClusterResult$p.adjust < 0.01),]
+dotplot(cr_bp_all2_s, showCategory=100, by="rowPercentage")
+cr_bp_all2=cr_bp_all2_s
+```
+
+```{r goanalysis2file}
+write.csv(cr_bp_all2_s, file="go2_cerebellum.csv")
+```
+
+
+
+### KEGG
+
+```{r}
+cr_k2=compareCluster(geneCluster=lista_for_enrichment, keyType="uniprot", fun="enrichKEGG", organism="mmu", universe=unique(universe))
+write.csv(as.data.frame(cr_k2), "p_cr_kegg2_cerebellum.csv")
+
+```
+
+```{r, fig.width=14}
+dotplot(cr_k2, showCategory=100, by="rowPercentage")
+
+
+```
+
+
+### Overlap correlating rescued (proteome)
+
+```{r}
+
+category=length(unique(unlist(rescued_proteome)))
+universe=length(unique(c(unlist(universe_proteomic))))
+de_list_inuniverse=length(de_corr)
+de_list_incat=length(intersect(de_corr,unique(unlist(rescued_proteome))))
+mat=count_table(category, universe, de_list_inuniverse, de_list_incat)
+fisher.test((mat), alternative="greater")
+
+overlaprescuedcorr=intersect(de_corr,unique(unlist(rescued_proteome)))
+
+```
+
+
+
+
+
+
+## Overlap with Hippocampus
+
+
+I computed the overlaps between the differentially expressed proteins in hippocampus and in cerebellum; the results are summarized by an heatmap where the colour code reflects the Szymkiewicz-Simpson overlap coefficient, given by the following formula: score= `length( A intersection B) / min(lenght(A), length(B))`.
+
+
+
+```{r}
+
+#helper functions
+get_de=function(df, log2FC=0.3, pvalue=0.05){ #get de proteins of desired abs log2FC and p.value 
+  df_de=df[which(abs(df$log2FC)>log2FC),]
+  df_de=df_de[df_de$adj.pvalue<pvalue,]
+  return(df_de)
+}
+count_table<-function(category, universe, de_list_inuniverse, de_list_incat){#given number of element in each list create a contigency table for performing fisher test
+  mat=matrix(c(de_list_incat, 
+               de_list_inuniverse-de_list_incat,
+               category-de_list_incat,
+               universe-(category-de_list_incat+de_list_inuniverse)),2)
+}
+
+pwttg=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/myresults_WT_TG.txt", header=T, row.names=1)
+wttg_pa1=unique(as.character(read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inTGnotinWT.csv")$Leading.razor.protein))
+wttg_pa2=unique(as.character(read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inWTnotinTG.csv")$Leading.razor.protein))
+
+pwt_wtegcg=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/myresults_WT_NT-WT_EGCG.txt", header=T, row.names=1)
+wt_wtegcg_pa1=unique(as.character(read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inWTNTnotinWTEGCG.csv")$Leading.razor.protein))
+wt_wtegcg_pa2=unique(as.character(read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inWTEGCGnotinWTNT.csv")$Leading.razor.protein))
+
+ptg_tgegcg=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/myresults_TG_NT-TG_EGCG.txt", header=T, row.names=1)
+tg_tgegcg_pa1=unique(as.character(read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inTGEGCGnotinTGNT.csv")$Leading.razor.protein))
+tg_tgegcg_pa2=unique(as.character(read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/inTGNTnotinTGEGCG.csv")$Leading.razor.protein))
+
+
+pint_egcg=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/myresults_WT_NT-WT_EGCG_-_TG_NT-TG_EGCG.txt", header=T, row.names=1)
+int_egcg_pa1=unique(as.character(read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/pa1intEGCG.csv")$Leading.razor.protein))
+int_egcg_pa2=unique(as.character(read.csv("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/pa2intEGCG.csv")$Leading.razor.protein))
+
+#find de proteins
+pwttg_de=get_de(pwttg)
+
+pwt_wtegcg_de=get_de(pwt_wtegcg)
+
+ptg_tgegcg_de=get_de(ptg_tgegcg)
+pint_egcg_de=get_de(pint_egcg)
+
+
+
+protein_wttg=unique(c(rownames(pwttg_de), wttg_pa1, wttg_pa2))
+universe_wttg=unique(c(rownames(pwttg), wttg_pa1, wttg_pa2))
+target_inuni=intersect(dyrk1a_targets,universe_wttg)
+target_inwttg=intersect(dyrk1a_targets,protein_wttg)
+#merged_protein[which(merged_protein$UNIPROTKB %in% as.character(target_inwttg)),]
+protein_wt_wtegcg=unique(c(rownames(pwt_wtegcg_de), wt_wtegcg_pa1, wt_wtegcg_pa2))
+
+protein_tg_tgegcg=unique(c(rownames(ptg_tgegcg_de), tg_tgegcg_pa1, tg_tgegcg_pa2))
+
+protein_int_egcg=unique(c(rownames(pint_egcg_de), int_egcg_pa1, int_egcg_pa2))
+universe_wt_wtegcg=unique(c(rownames(pwt_wtegcg), wt_wtegcg_pa1, wt_wtegcg_pa2))
+universe_tg_tgegcg=unique(c(rownames(ptg_tgegcg), tg_tgegcg_pa1, tg_tgegcg_pa2))
+universe_int_egcg=unique(c(rownames(pint_egcg), int_egcg_pa1, int_egcg_pa2))
+
+ap=list(protein_wttg,
+       protein_wt_wtegcg, 
+       protein_tg_tgegcg, 
+       protein_int_egcg)
+
+bp=list(universe_wttg,
+       universe_wt_wtegcg, 
+       universe_tg_tgegcg, 
+       universe_int_egcg)
+```
+
+
+
+```{r, fig.show="hide", include=FALSE}
+require(gplots)
+library(gridGraphics)
+library(grid)
+grab_grob <- function(){
+  grid.echo()
+  grid.grab()
+}
+require(gridExtra)
+load("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteinsdeindyrk1a.RData")
+a2=a2[c(1,2,5,8)]
+b2=b2[c(1,2,5,8)]
+
+
+
+mat1b=matrix(rep(NA,16), 4,4)
+for (o in 1:4){
+  for (n in 1:4){
+#     ou=bp[[o]]
+#     nu=b[[n]]
+    op=ap[[o]]
+    np=a2[[n]]
+#     #n total number of proteins
+#     universe=length(unique(c(ou,nu)))
+#     category=length(unique(op))
+#     de_list_inuniverse=length(unique(np))
+#     de_list_incat=length(intersect(unique(np), unique(op)))
+#     table=count_table(category, universe, de_list_inuniverse, de_list_incat)
+#     f=fisher.test(table, alternative="greater")
+#     #matrix(c(n - union(A,B), setdiff(A,B), setdiff(B,A), intersect(A,B)), nrow=2)
+#     mat1b[o,n]=-1*(log10(f$p.value))
+    mat1b[o,n]=length(intersect(op, np))/min(length(op),length(np))
+  }
+}
+
+rownames(mat1b)=c("wttg", "wtegcg", "tgegcg", "integcg")
+colnames(mat1b)=c("wttg", "wtegcg", "tgegcg", "integcg")
+
+
+
+
+mat1c=matrix(rep(NA,16), 4,4)
+for (o in 1:4){
+  for (n in 1:4){
+#     ou=bp[[o]]
+#     nu=b[[n]]
+    op=ap[[o]]
+    np=a2[[n]]
+#     #n total number of proteins
+#     universe=length(unique(c(ou,nu)))
+#     category=length(unique(op))
+#     de_list_inuniverse=length(unique(np))
+#     de_list_incat=length(intersect(unique(np), unique(op)))
+#     table=count_table(category, universe, de_list_inuniverse, de_list_incat)
+#     f=fisher.test(table, alternative="greater")
+#     #matrix(c(n - union(A,B), setdiff(A,B), setdiff(B,A), intersect(A,B)), nrow=2)
+#     mat1b[o,n]=-1*(log10(f$p.value))
+    mat1c[o,n]=length(intersect(op, np))
+  }
+}
+
+rownames(mat1c)=c("wttg", "wtegcg", "tgegcg", "integcg")
+colnames(mat1c)=c("wttg", "wtegcg", "tgegcg", "integcg")
+
+
+mat1d=matrix(rep(NA,16), 4,4)
+for (o in 1:4){
+  for (n in 1:4){
+     ou=bp[[o]]
+     nu=b2[[n]]
+    op=ap[[o]]
+    np=a2[[n]]
+     #n total number of proteins
+    universe=length(unique(c(ou,nu)))
+     category=length(unique(op))
+     de_list_inuniverse=length(unique(np))
+     de_list_incat=length(intersect(unique(np), unique(op)))
+     table=count_table(category, universe, de_list_inuniverse, de_list_incat)
+     f=fisher.test(table, alternative="greater")
+     #matrix(c(n - union(A,B), setdiff(A,B), setdiff(B,A), intersect(A,B)), nrow=2)
+     mat1d[o,n]=f$p.value
+  }
+}
+
+
+xlabels=c("overlap coefficient", "number of overlapping proteins","p-value of Fisher test")
+rownames(mat1d)=c("wttg", "wtegcg", "tgegcg", "integcg")
+colnames(mat1d)=c("wttg", "wtegcg", "tgegcg", "integcg")
+
+
+
+arr=list(mat1b, mat1c, mat1d)
+grid.newpage()
+GL <- lapply(1:3, function(i){
+  heatmap.2(arr[[i]], dendrogram="none", scale="none", density.info="none", trace="none", col=rev(colorRampPalette(brewer.pal(9, "OrRd"))(256)), main="Overlap hippocampus/cerebellum",key.xlab=xlabels[i], key.title="", Rowv=FALSE, Colv=rev("Rowv"), ,srtCol=45, notecex=2,cellnote=round(arr[[i]],2))
+  grab_grob()
+})
+
+
+  # heatmap.2(overlaps_proteome[[1]], dendrogram="none", scale="none", density.info="none", trace="none", col=rev(colorRampPalette(brewer.pal(9, "OrRd"))(256)), key.title="", Rowv=FALSE, Colv=rev("Rowv")
+  #           ,cellnote=round(overlaps_proteome[[2]],2)
+  #           , keysize=1,key.xlab ="p-value Fisher test",margins=c(13.5,27),srtCol=45, notecex=2,
+  #           breaks=c(seq(0,1,length=257)))
+```
+
+```{r, fig.eight=5, fig.width=20}
+grid.arrange(grobs=GL, ncol=3, clip=TRUE)
+```
+
+The overlap between the DE protein in hippocampus and cerebellum is not so high, indicating the protein deregulation in the two tissue is pretty different.
+
+```{r}
+save.image("cerebellum.rda")
+```
+
+
+
+### PCA cerebellum and hippocampus
+
+
+MDS plot with hippocampus (HPC) and cerebellum (CRB) sample, on commonly detected peptides, with imputation.
+
+```{r}
+data=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/Mireia/Cerebellum/peptides_cerebellum.txt",sep="\t",header=T,as.is=T,stringsAsFactors = FALSE, comment.char = "")
+# de=unique(as.character(unlist(ap)))
+
+rownames(data)=paste(data$Sequence, data$Leading.razor.protein, sep=".")
+data=data[,c(4:8,10:14, 16:19, 21:25)]
+
+
+
+
+
+
+data_hpc=read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/peptides.txt",sep="\t",header=T,as.is=T,stringsAsFactors = FALSE, comment.char = "")
+rownames(data_hpc)=paste(data_hpc$Sequence, data_hpc$Leading.razor.protein, sep=".")
+
+data_hpc=data_hpc[,c(4:8,10:14, 27,29:31, 33:37)]
+
+
+common_peptides=intersect(rownames(data), rownames(data_hpc))
+
+data_tomerge=data[common_peptides,]
+colnames(data_tomerge)=paste("CRB", colnames(data),sep=".")
+data_hpc_tomerge=data_hpc[common_peptides,]
+colnames(data_hpc_tomerge)=paste("HPC", colnames(data_hpc),sep=".")
+
+data_merged=cbind(data_tomerge, data_hpc_tomerge)
+# is_na_data=apply(data,1,FUN=function(x)(sum(is.na(x))))
+# table(is_na_data)
+# data_filt=data[which(is_na_data<15),]
+require(limma)
+dataset <- new("ExpressionSet", exprs = as.matrix(data_merged))
+lev=c(paste("HPC", c("WT_NT", "WT_EGCG", "TG_NT", "TG_EGCG"), sep="."),paste("CRB", c("WT_NT", "WT_EGCG", "TG_NT", "TG_EGCG"), sep="."))
+
+library(Biobase)
+f=sapply(sampleNames(dataset), FUN=function(x)(substr(x, start=1, stop =nchar(x)-4)))
+
+f=factor(f, levels=lev)
+design <- model.matrix(~0+f)
+
+colnames(design) <- lev
+fit <- lmFit(dataset, design)
+
+experimental_design=cbind(names(f), as.character(f),
+                          rep(c(rep(c(1:5),2),
+                            1:4,
+                            1:5
+
+                            ),2))
+
+experimental_design=as.data.frame(experimental_design)
+colnames(experimental_design)=c("label", "condition", "replicate")
+
+
+tota_se=data_merged
+tota_se$name=rownames(tota_se)
+tota_se$ID=rownames(tota_se)
+
+
+require(DEP)
+data_se <- make_se(tota_se, 1:38, experimental_design)
+
+
+tota_norm=normalize_vsn(data_se)
+
+
+plot_normalization(data_se, tota_norm)
+
+
+
+
+
+
+
+tota_norm <- filter_missval(tota_norm, thr = 2)
+
+
+require(vsn)
+require(MSnbase)
+require(DEP)
+
+library("dplyr")
+library("tidyr")
+library("purrr")
+library("ggplot2")
+library("SummarizedExperiment")
+
+
+
+proteins_MNAR <- get_df_long(tota_norm) %>%
+  group_by(name, condition) %>%
+  summarize(NAs = all(is.na(intensity))) %>% 
+  filter(NAs) %>% 
+  pull(name) %>% 
+  unique()
+
+# Get a logical vector
+MNAR <- names(tota_norm) %in% proteins_MNAR
+
+# Perform a mixed imputation
+mixed_imputation_merged <- DEP::impute(
+  tota_norm, 
+  fun = "mixed",
+  randna = !MNAR, # we have to define MAR which is the opposite of MNAR
+  mar = "knn", # imputation function for MAR
+  mnar = "zero") # imputation function for MNAR
+
+
+
+
+plotMDS(assay(mixed_imputation_merged))
+
+```
+
+
+Only cerebellum
+```{r crb}
+plotMDS(assay(mixed_imputation_merged)[,1:19], col=c(rep("red", 5), rep("purple", 5), rep("blue", 4), rep("green", 5)))
+```
+
+
+MDS plot on common peptides, no imputation. Only rows without any NA were used.
+
+```{r}
+plotMDS(assay(tota_norm)[complete.cases(assay(tota_norm)),])
+```
+
+only cerebellum
+```{r}
+plotMDS(assay(tota_norm)[complete.cases(assay(tota_norm)),1:19], col=c(rep("red", 5), rep("purple", 5), rep("blue", 4), rep("green", 5)))
+```
+
+```{r}
+# mymodel <- lm(DI ~ Genotype*Treatment, data)
+# pairwise <- glht(mymodel, linfct = mcp(Genotype = "Tukey"))
+# result <- round(cbind(confint(pairwise)$confint, summary(pairwise)$test$pva), 3)
+# colnames(result) <- c("Difference", "95%CI Low", "95%CI Upp", "p-value")
+# 
+# 
+# Treat=as.factor(paste(data$Genotype, data$Treatment, sep="."))
+# design=model.matrix(~0+Treat)
+# colnames(design) <- levels(Treat)
+# require(limma)
+# cm <- makeContrasts(TG_vs_WT=TG.NT-WT.NT,
+#                     WTEGCG_vs_WTNT=WT.EGCG-WT.NT,  
+#                     
+#                     TGEGCG_vs_TGNT=TG.EGCG-TG.NT,  
+#                     
+#                     levels=design)
+# 
+# cm
+# dati=as.data.frame(t(data$DI))
+# mymodel <- lm(DI ~ 0+Treat, data)    
+# 
+# pairwise <- glht(mymodel, linfct = t(cm))
+# summary(pairwise)
+# 
+# 
+# codes=as.data.frame(t(read.table("/Users/ilario/OneDrive - CRG - Centre de Regulacio Genomica/Dropbox (CRG)/proteomics_HPC_paper/Code-data/NOR_parameters_all.txt", sep="\t", row.names=1, stringsAsFactors = FALSE,header=F)))
+# 
+# rownames(codes)=codes$N_Animal
+# 
+# codes$SA=as.numeric(codes$SA)
+# 
+# 
+# codes$`Distance/activity`=as.numeric(codes$`Distance/activity`)
+# 
+# 
+# behaviour2$code=as.character(behaviour2$code)
+# 
+# codes$with_proteomics=rep("no", length(codes$SA))
+# 
+# codes$with_proteomics[which(codes$N_Animal %in% behaviour2$code)]="yes"
+# 
+# codes=codes[-(grep("EE", codes$Condition)),]
+# 
+# codes$Condition=factor(codes$Condition, levels=c("WT" ,     "WT_EGCG", "TG"   ,   "TG_EGCG"))
+```
+
+
+```{r}
+# Treat=codes$Condition
+# design=model.matrix(~0+Treat)
+# colnames(design) <- levels(Treat)
+# require(limma)
+# cm <- makeContrasts(TG_vs_WT=TG-WT,
+#                     WTEGCG_vs_WTNT=WT_EGCG-WT,  
+#                     
+#                     TGEGCG_vs_TGNT=TG_EGCG-TG,  
+#                     
+#                     levels=design)
+# 
+# cm
+# mymodel <- lm(SA ~ 0+Treat, codes)    
+# 
+# pairwise <- glht(mymodel, linfct = t(cm))
+# summary(pairwise)
+# 
+# shapes=rep(1.5, length(codes$N_Animal))
+# shapes[which(codes$with_proteomics=="yes")]=3
+# p <- ggplot(codes, aes(x=Condition, y=SA)) + geom_boxplot(outlier.size=1.5, fill=c("blue", "green", "blue", "green"), color=c(rep("black", 2), rep("red",2)))+ geom_jitter(size=shapes,shape=16, position=position_jitter(0.2))+ylab("Spontaneous Alternation (SA))")  + theme_bw()
+# # Box plot with jittered points
+# # 0.2 : degree of jitter in x direction
+# p
+# 
+# 
+# 
+# Treat=codes$Condition[which(codes$with_proteomics=="yes")]
+# design=model.matrix(~0+Treat)
+# colnames(design) <- levels(Treat)
+# require(limma)
+# cm <- makeContrasts(TG_vs_WT=TG-WT,
+#                     WTEGCG_vs_WTNT=WT_EGCG-WT,  
+#                     
+#                     TGEGCG_vs_TGNT=TG_EGCG-TG,  
+#                     
+#                     levels=design)
+# 
+# codes2=codes[which(codes$with_proteomics=="yes"),]
+# mymodel <- lm(SA ~ 0+Treat, codes2)    
+# 
+# pairwise <- glht(mymodel, linfct = t(cm))
+# summary(pairwise)
+# 
+# 
+# mymodel <- lm(`Distance/activity` ~ 0+Treat, codes2)    
+# 
+# pairwise <- glht(mymodel, linfct = t(cm))
+# summary(pairwise)
+```
+
+
+```{r}
+
+# mymodel <- lm(`Distance/activity` ~ 0+Treat, codes)    
+# 
+# pairwise <- glht(mymodel, linfct = t(cm))
+# summary(pairwise)
+# 
+# 
+# p <- ggplot(codes, aes(x=Condition, y=`Distance/activity`)) + geom_boxplot(outlier.size=1.5, fill=c("blue", "green", "blue", "green"), color=c(rep("black", 2), rep("red",2)))+ geom_jitter(size=shapes,shape=16, position=position_jitter(0.2))+ylab("Distance/activity")  + theme_bw()
+# # Box plot with jittered points
+# # 0.2 : degree of jitter in x direction
+# p
+```
+
+
+
+```{r}
+require(TissueEnrich)
+de_crb=getBM(attributes=c("uniprotswissprot", "mgi_symbol"),filters="uniprotswissprot", values=ap[[1]], mart = mouse)
+bg_crb=getBM(attributes=c("uniprotswissprot", "mgi_symbol"),filters="uniprotswissprot", values=bp[[1]], mart = mouse)
+gs_crb<-GeneSet(geneIds=de_crb$mgi_symbol,organism="Mus Musculus",geneIdType=SymbolIdentifier())
+gs_crb_bg<-GeneSet(geneIds=bg_crb$mgi_symbol,organism="Mus Musculus",geneIdType=SymbolIdentifier())
+
+output_crb<-teEnrichment(inputGenes = gs_crb, rnaSeqDataset=3, backgroundGenes=gs_crb_bg)
+```
+
+```{r}
+seEnrichmentOutput<-output_crb[[1]]
+enrichmentOutput<-setNames(data.frame(assay(seEnrichmentOutput),row.names = rowData(seEnrichmentOutput)[,1]), colData(seEnrichmentOutput)[,1])
+enrichmentOutput$Tissue<-row.names(enrichmentOutput)
+head(enrichmentOutput)
+```
+
+
+```{r}
+library(tidyr)
+seExp<-output_crb[[2]][["Cerebellum"]]
+exp<-setNames(data.frame(assay(seExp), row.names = rowData(seExp)[,1]), colData(seExp)[,1])
+exp$Gene<-row.names(exp)
+exp<-exp %>% gather(key = "Tissue", value = "expression",1:(ncol(exp)-1))
+
+ggplot(exp, aes(Tissue, Gene)) + geom_tile(aes(fill = expression),
+                                           colour = "white") + scale_fill_gradient(low = "white",
+                                                                                   high = "steelblue")+
+  labs(x='', y = '')+
+  theme_bw()+
+  guides(fill = guide_legend(title = "Log2(TPM)"))+
+  #theme(legend.position="none")+
+  theme(plot.title = element_text(hjust = 0.5,size = 20),axis.title = element_text(size=15))+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),panel.grid.major= element_blank(),panel.grid.minor = element_blank())
+```
+
+```{r plottissueenrich}
+tE=ggplot(exp, aes(Tissue, Gene)) + geom_tile(aes(fill = expression),
+                                           colour = "white") + scale_fill_gradient(low = "white",
+                                                                                   high = "steelblue")+
+  labs(x='', y = '')+
+  theme_bw()+
+  guides(fill = guide_legend(title = "Log2(TPM)"))+
+  #theme(legend.position="none")+
+  theme(plot.title = element_text(hjust = 0.5,size = 20),axis.title = element_text(size=15))+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),panel.grid.major= element_blank(),panel.grid.minor = element_blank())
+```
+
+### gtex hpc
+
+```{r}
+mouse=useMart(biomart = "ENSEMBL_MART_ENSEMBL",dataset="mmusculus_gene_ensembl")
+
+de_hpc=getBM(attributes=c("uniprotswissprot", "mgi_symbol"),filters="uniprotswissprot", values=a2[[1]], mart = mouse)
+bg_hpc=getBM(attributes=c("uniprotswissprot", "mgi_symbol"),filters="uniprotswissprot", values=b2[[1]], mart = mouse)
+gs_hpc<-GeneSet(geneIds=unique(de_hpc$mgi_symbol),organism="Mus Musculus",geneIdType=SymbolIdentifier())
+gs_hpc_bg<-GeneSet(geneIds=unique(bg_hpc$mgi_symbol),organism="Mus Musculus",geneIdType=SymbolIdentifier())
+
+output_hpc<-teEnrichment(inputGenes = gs_hpc, rnaSeqDataset=3, backgroundGenes=gs_hpc_bg)
+```
+
+```{r}
+seEnrichmentOutput<-output_hpc[[1]]
+enrichmentOutput<-setNames(data.frame(assay(seEnrichmentOutput),row.names = rowData(seEnrichmentOutput)[,1]), colData(seEnrichmentOutput)[,1])
+enrichmentOutput$Tissue<-row.names(enrichmentOutput)
+head(enrichmentOutput)
+```
+
+
+```{r}
+require(ABAEnrichment)
+
+gene_ids = unique(toupper(c(bg_crb$mgi_symbol, de_crb$mgi_symbol)))
+input_hyper = data.frame(gene_ids, is_candidate=0)
+
+input_hyper$is_candidate[which(input_hyper$gene_ids %in% toupper(de_crb$mgi_symbol))]=1
+head(input_hyper)
+
+res_adult = aba_enrich(input_hyper, dataset='adult')
+
+res_adult[[1]][grep("*erebe*", res_adult[[1]]$structure),]
+
+crb = get_annotated_genes(structure_ids='Allen:4696', dataset='adult', 
+    cutoff_quantiles=0.9, genes=toupper(de_crb$mgi_symbol))
+
+quantiles=seq(0.1,.9, by=0.1)
+number_genes_cereb=rep(NA, length(quantiles))
+for(i in 1:length(quantiles)){
+  crb = get_annotated_genes(structure_ids='Allen:4696', dataset='adult', 
+    cutoff_quantiles=quantiles[i], genes=toupper(de_crb$mgi_symbol))
+  number_genes_cereb[i]=dim(crb)[1]
+}
+
+number_genes_hpc=rep(NA, length(quantiles))
+for(i in 1:length(quantiles)){
+  crb = get_annotated_genes(structure_ids='Allen:4249', dataset='adult', 
+    cutoff_quantiles=quantiles[i], genes=toupper(de_crb$mgi_symbol))
+  number_genes_hpc[i]=dim(crb)[1]
+}
+
+
+plot(quantiles, number_genes_cereb, type="b", ylab="DEGs in the cerebellum in TG (n)")
+points(quantiles, number_genes_hpc, type="b", col="gray")
+legend("bottomleft",c("Cerebellum", "Hippocampal formation"), fill=c("black", "gray"), title="expressed in:")
+```
+
+
+```{r}
+number_genes_cereb=rep(NA, length(quantiles))
+for(i in 1:length(quantiles)){
+  crb = get_annotated_genes(structure_ids='Allen:4696', dataset='adult', 
+    cutoff_quantiles=quantiles[i], genes=toupper(de_hpc$mgi_symbol))
+  number_genes_cereb[i]=dim(crb)[1]
+}
+
+number_genes_hpc=rep(NA, length(quantiles))
+for(i in 1:length(quantiles)){
+  crb = get_annotated_genes(structure_ids='Allen:4249', dataset='adult', 
+    cutoff_quantiles=quantiles[i], genes=toupper(de_hpc$mgi_symbol))
+  number_genes_hpc[i]=dim(crb)[1]
+}
+
+
+plot(quantiles, number_genes_hpc, type="b", col="gray", ylab="DEGs in the HPC in TG (n)")
+points(quantiles, number_genes_cereb, type="b")
+
+```
+
+
+```{r}
+number_genes_cereb=rep(NA, length(quantiles))
+for(i in 1:length(quantiles)){
+  crb = get_annotated_genes(structure_ids='Allen:4696', dataset='adult', 
+    cutoff_quantiles=quantiles[i], genes=toupper(bg_crb$mgi_symbol))
+  number_genes_cereb[i]=dim(crb)[1]
+}
+
+number_genes_hpc=rep(NA, length(quantiles))
+for(i in 1:length(quantiles)){
+  crb = get_annotated_genes(structure_ids='Allen:4249', dataset='adult', 
+    cutoff_quantiles=quantiles[i], genes=toupper(bg_crb$mgi_symbol))
+  number_genes_hpc[i]=dim(crb)[1]
+}
+
+
+plot(quantiles, number_genes_hpc, type="b", col="gray", ylab="genes in the cerebellum in TG (n)")
+points(quantiles, number_genes_cereb, type="b")
+
+legend("bottomleft",c("Cerebellum", "Hippocampal formation"), fill=c("black", "gray"), title="expressed in:")
+```
+
+
+
+
+```{r}
+number_genes_cereb=rep(NA, length(quantiles))
+for(i in 1:length(quantiles)){
+  crb = get_annotated_genes(structure_ids='Allen:4696', dataset='adult', 
+    cutoff_quantiles=quantiles[i], genes=toupper(bg_hpc$mgi_symbol))
+  number_genes_cereb[i]=dim(crb)[1]
+}
+
+number_genes_hpc=rep(NA, length(quantiles))
+for(i in 1:length(quantiles)){
+  crb = get_annotated_genes(structure_ids='Allen:4249', dataset='adult', 
+    cutoff_quantiles=quantiles[i], genes=toupper(bg_hpc$mgi_symbol))
+  number_genes_hpc[i]=dim(crb)[1]
+}
+
+
+plot(quantiles, number_genes_hpc, type="b", col="gray", ylab="genes in the HPC in TG (n)")
+points(quantiles, number_genes_cereb, type="b")
+
+```
+
+
+```{r}
+
+de_hpc=getBM(attributes=c("uniprotswissprot", "mgi_symbol"),filters="uniprotswissprot", values=a2[[1]], mart = mouse)
+bg_hpc=getBM(attributes=c("uniprotswissprot", "mgi_symbol"),filters="uniprotswissprot", values=b2[[1]], mart = mouse)
+gs_hpc<-GeneSet(geneIds=unique(de_hpc$mgi_symbol),organism="Mus Musculus",geneIdType=SymbolIdentifier())
+gs_hpc_bg<-GeneSet(geneIds=unique(bg_hpc$mgi_symbol),organism="Mus Musculus",geneIdType=SymbolIdentifier())
+
+output_hpc<-teEnrichment(inputGenes = gs_hpc, rnaSeqDataset=3, backgroundGenes=gs_hpc_bg)
+```
+
+```{r}
+seEnrichmentOutput<-output_hpc[[1]]
+enrichmentOutput<-setNames(data.frame(assay(seEnrichmentOutput),row.names = rowData(seEnrichmentOutput)[,1]), colData(seEnrichmentOutput)[,1])
+enrichmentOutput$Tissue<-row.names(enrichmentOutput)
+head(enrichmentOutput)
+```
+
+
+
+```{r}
+library(tidyr)
+seExp<-output_hpc[[2]][["Cerebellum"]]
+exp<-setNames(data.frame(assay(seExp), row.names = rowData(seExp)[,1]), colData(seExp)[,1])
+exp$Gene<-row.names(exp)
+exp<-exp %>% gather(key = "Tissue", value = "expression",1:(ncol(exp)-1))
+
+
+
+
+ggplot(exp, aes(Tissue, Gene)) + geom_tile(aes(fill = expression),
+                                           colour = "white") + scale_fill_gradient(low = "white",
+                                                                                   high = "steelblue")+
+  labs(x='', y = '')+
+  theme_bw()+
+  guides(fill = guide_legend(title = "Log2(TPM)"))+
+  #theme(legend.position="none")+
+  theme(plot.title = element_text(hjust = 0.5,size = 20),axis.title = element_text(size=15))+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),panel.grid.major= element_blank(),panel.grid.minor = element_blank())
+```
+
+
+bg crb
+
+
+```{r}
+
+output_crb<-teEnrichment(inputGenes = gs_crb_bg, rnaSeqDataset=3)
+```
+
+
+
+```{r}
+library(tidyr)
+seExp<-output_crb[[2]][["Cerebellum"]]
+exp<-setNames(data.frame(assay(seExp), row.names = rowData(seExp)[,1]), colData(seExp)[,1])
+exp$Gene<-row.names(exp)
+exp<-exp %>% gather(key = "Tissue", value = "expression",1:(ncol(exp)-1))
+
+ggplot(exp, aes(Tissue, Gene)) + geom_tile(aes(fill = expression),
+                                           colour = "white") + scale_fill_gradient(low = "white",
+                                                                                   high = "steelblue")+
+  labs(x='', y = '')+
+  theme_bw()+
+  guides(fill = guide_legend(title = "Log2(TPM)"))+
+  #theme(legend.position="none")+
+  theme(plot.title = element_text(hjust = 0.5,size = 20),axis.title = element_text(size=15))+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),panel.grid.major= element_blank(),panel.grid.minor = element_blank())
+```
+
+bg hpc
+
+
+```{r}
+
+output_hpcbg<-teEnrichment(inputGenes = gs_hpc_bg, rnaSeqDataset=3)
+```
+
+
+
+```{r}
+library(tidyr)
+seExp<-output_hpcbg[[2]][["Cerebellum"]]
+exp<-setNames(data.frame(assay(seExp), row.names = rowData(seExp)[,1]), colData(seExp)[,1])
+exp$Gene<-row.names(exp)
+exp<-exp %>% gather(key = "Tissue", value = "expression",1:(ncol(exp)-1))
+
+ggplot(exp, aes(Tissue, Gene)) + geom_tile(aes(fill = expression),
+                                           colour = "white") + scale_fill_gradient(low = "white",
+                                                                                   high = "steelblue")+
+  labs(x='', y = '')+
+  theme_bw()+
+  guides(fill = guide_legend(title = "Log2(TPM)"))+
+  #theme(legend.position="none")+
+  theme(plot.title = element_text(hjust = 0.5,size = 20),axis.title = element_text(size=15))+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),panel.grid.major= element_blank(),panel.grid.minor = element_blank())
+```
+
+
+```{r}
+hpc_crb=list("HPC"=a2[[1]], "CRB"=ap[[1]])
+
+
+anno=getBM(attributes=c("uniprotswissprot", "mgi_symbol", "description"),filters="uniprotswissprot", values=intersect(a2[[1]], ap[[1]]), mart = mouse)
+
+lista=c(anno$mgi_symbol, "Hba-a1", "Map11", "Myh11", "Hbb-b1")
+
+require(clusterProfiler)
+require(org.Mm.eg.db)
+lista.id=bitr(lista, fromType = "SYMBOL",
+        toType = "ENTREZID",
+        OrgDb = org.Mm.eg.db)$ENTREZID
+```
+
+
+#### GO
+
+```{r}
+ego <- enrichGO(gene          = lista.id,
+                OrgDb         = org.Mm.eg.db,
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 0.05,
+        readable      = TRUE)
+ego2 <- enrichGO(gene          = lista.id,
+                OrgDb         = org.Mm.eg.db,
+                ont           = "MF",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 0.05,
+        readable      = TRUE)
+ego3 <- enrichGO(gene          = lista.id,
+                OrgDb         = org.Mm.eg.db,
+                ont           = "CC",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 0.05,
+        readable      = TRUE)
+```
+
+
+```{r}
+dotplot(ego, showCategory=100)
+dotplot(ego2, showCategory=100)
+dotplot(ego3, showCategory=100)
+
+```
+
+#### KEGG
+
+```{r}
+
+kk <- enrichKEGG(gene         = lista.id,
+                 organism     = 'mmu',
+                 pvalueCutoff = 0.05)
+
+
+```
+
+```{r}
+dotplot(kk, showCategory=100)
+
+```
+
+
+#### REACTOME
+
+```{r}
+require(ReactomePA)
+require(DOSE)
+rr <- enrichPathway(gene         = lista.id,
+                 organism     = 'mouse',
+                 pvalueCutoff = 0.05)
+```
+
+
+
+
+
+
+
+```{r}
+output_crb<-teEnrichment(inputGenes = gs_crb, rnaSeqDataset=3, backgroundGenes=gs_crb_bg)
+seExp<-output_crb[[2]][["Cerebellum"]]
+exp<-setNames(data.frame(assay(seExp), row.names = rowData(seExp)[,1]), colData(seExp)[,1])
+exp$Gene<-row.names(exp)
+exp<-exp %>% gather(key = "Tissue", value = "expression",1:(ncol(exp)-1))
+tsgs=unique(exp$Gene)
+capitalize=function(x){
+  y=tolower(x)
+  
+  y_split=strsplit(y, split="")[[1]]
+  y_split[[1]]=toupper(y_split[[1]])
+  
+  return(paste(y_split, collapse =""))
+}
+
+lista=sapply(tolower(tsgs), FUN=capitalize)
+lista=c(lista, "Trappc14")
+require(clusterProfiler)
+require(org.Mm.eg.db)
+lista.id=bitr(lista, fromType = "SYMBOL",
+        toType = "ENTREZID",
+        OrgDb = org.Mm.eg.db)$ENTREZID
+```
+
+
+#### GO
+
+```{r}
+ego <- enrichGO(gene          = lista.id,
+                OrgDb         = org.Mm.eg.db,
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 0.05,
+        readable      = TRUE)
+
+# ego2 <- enrichGO(gene          = lista.id,
+#                 OrgDb         = org.Mm.eg.db,
+#                 ont           = "MF",
+#                 pAdjustMethod = "BH",
+#                 pvalueCutoff  = 0.05,
+#                 qvalueCutoff  = 0.05,
+#         readable      = TRUE)
+# ego3 <- enrichGO(gene          = lista.id,
+#                 OrgDb         = org.Mm.eg.db,
+#                 ont           = "CC",
+#                 pAdjustMethod = "BH",
+#                 pvalueCutoff  = 0.05,
+#                 qvalueCutoff  = 0.05,
+#         readable    = TRUE)
+```
+
+
+```{r}
+dotplotfirst=dotplot(ego, showCategory=100)
+# dotplot(ego2, showCategory=100)
+# dotplot(ego3, showCategory=100)
+```
+
+#### KEGG
+
+```{r}
+
+
+kk <- enrichKEGG(gene       = lista.id,
+                 organism     = 'mmu',
+                 pvalueCutoff = 0.05)
+
+```
+
+```{r}
+#dotplot(kk, showCategory=100)
+```
+
+
+#### REACTOME
+
+```{r}
+require(ReactomePA)
+require(DOSE)
+rr <- enrichPathway(gene       = lista.id,
+                 organism     = 'mouse',
+                 pvalueCutoff = 0.05)
+
+
+```
+
+```{r}
+dplotlast=dotplot(rr, showCategory=100)
+#dplotlast
+
+
+```
+
+
+
+
+
+
+```{r}
+save.image("cerebellum.rda")
+```
+
+
+
